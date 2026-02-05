@@ -1,0 +1,1442 @@
+{
+  "metadata": {
+    "project_name": "费控本体Data Objects库",
+    "document_type": "本体定义 (Ontology Schema)",
+    "version": "0.1",
+    "last_updated": "2026-02-03",
+    "description": "费控本体Data Objects库，name是对象中文名称，ID是对象英文名称，type是对象的类型（范围包含data、rule），description是对象的描述（包含对象定义、使用场景），relationship_description是对象之间的关系，primary_key是对象的主键，properties中包含了对象的属性（其中name是属性的名称，type是属性的数据类型，description是属性的描述）。"
+  },
+  "objects": [
+    {
+      "id": "employee",
+      "name": "员工",
+      "type": "data",
+      "description": "员工对象是企业内部人员实体，员工对象信息源是HR系统。费用控制系统使用员工工号、归属部门、职级职位、工作区域、发薪账号等基础信息，并附加差旅等级、费控系统角色标签、借款余额等业务属性。通过“角色标签”定义其在系统中的业务身份，员工在费控中可以有多重角色（如既是提单人、业务审批人、财务），“差旅等级”直接影响酒店费用以及差旅补助标准。",
+      "relationship_description": "【员工】（作为提单人）提交【BTA申请单】；【员工】（作为提单人）提交【ECA报销单】；【员工】（作为业务审批人）审批【BTA申请单】的合理性；【员工】（作为业务审批人）审批【ECA报销单】的合理性；【员工】（作为财务）审核【BTA申请单】借款合规性；【员工】（作为财务）审核【ECA报销单】报销合规性；",
+      "primary_key": "employee_id",
+      "properties": [
+        {
+          "name": "employee_id",
+          "type": "String",
+          "description": "员工工号，例如0000111001，是员工的唯一身份标识。"
+        },
+        {
+          "name": "full_name",
+          "type": "String",
+          "description": "姓名，员工的真实名字"
+        },
+        {
+          "name": "personnel_number",
+          "type": "String",
+          "description": "E-HR编码。人事系统的ID，每个员工档案对应唯一编码。"
+        },
+        {
+          "name": "job_title",
+          "type": "String",
+          "description": "员工职位，员工在人事档案中的行政官衔（比如：技术.咨询顾问.设计师，是员工在公司的岗位级别）。"
+        },
+        {
+          "name": "travel_grade",
+          "type": "String",
+          "description": "差旅等级，枚举值范围: [A, B, C, D]，直接决定出差可预定机票舱位和在不同城市出差时的酒店限额"
+        },
+        {
+          "name": "legal_entity",
+          "type": "String",
+          "description": "受益公司，员工的签约公司实体名称"
+        },
+        {
+          "name": "hiring_location",
+          "type": "String",
+          "description": "招聘协议地。员工被招聘录用后，签订合同的办公地点，可用于判断出差是否发生（目的地和招聘协议地不一致则判定为出差）。"
+        },
+        {
+          "name": "payment_currency",
+          "type": "String",
+          "description": "支付币种。默认值: CNY"
+        },
+        {
+          "name": "outstanding_loan_balance",
+          "type": "Double",
+          "description": "当前未归还的借款本金。用于风控规则：若数值大于0（即存在未结清借款），系统将禁止发起新的借款申请。"
+        },
+        {
+          "name": "department_id",
+          "type": "String",
+          "description": "部门编码，员工归属部门的部门编码"
+        },
+        {
+          "name": "bank_account_number",
+          "type": "String",
+          "description": "收款账户，默认为员工工资卡号。"
+        },
+        {
+          "name": "system_roles",
+          "type": "List<String>",
+          "description": "系统角色标签。包含普通员工、财务专员、业务审批人、出纳等，同一员工可拥有多个标签。"
+        }
+      ]
+    },
+    {
+      "id": "project",
+      "name": "项目",
+      "type": "data",
+      "description": "项目是系统最小的费用管控单元，所有费用报销都必须归属项目，项目对象的信息源是项目管理系统，费控系统使用项目的项目编码、项目名、项目经理、项目状态等基本信息。员工通过项目编码选择发生费用的项目。项目成本会根据归属部门层级汇总到部门成本，项目状态在“异常”，将禁止员工发起该项目的出差申请和费用报销申请。",
+      "relationship_description": "【项目】由【员工】在【AES系统】管理；【项目】关联【项目月度费用预算】（一对多）；【项目】属于【部门】（行政归属）",
+      "primary_key": "project_code",
+      "properties": [
+        {
+          "name": "project_code",
+          "type": "String",
+          "description": "项目编码,项目在AES系统中的唯一标识。"
+        },
+        {
+          "name": "project_name",
+          "type": "String",
+          "description": "项目名称"
+        },
+        {
+          "name": "manager_employee_id",
+          "type": "String",
+          "description": "项目负责人ID，项目经理工号。",
+          "references": "Employee"
+        },
+        {
+          "name": "business_group",
+          "type": "String",
+          "description": "业务集团。项目归属的业务集团"
+        },
+        {
+          "name": "beneficiary_department_level_1",
+          "type": "String",
+          "description": "受益一级部门。项目归属的一级业务部门。项目虽然是直接的费用承担者，但其产生的成本最终会汇总至特定的行政部门。该属性定义了财务核算层面的成本归属关系"
+        },
+        {
+          "name": "beneficiary_department_level_2",
+          "type": "String",
+          "description": "受益二级部门。项目归属的二级业务部门。",
+          "references": "HRO_Service_Contract"
+        },
+        {
+          "name": "beneficiary_department_level_3",
+          "type": "String",
+          "description": "受益三级部门。项目归属的三级业务部门。"
+        },
+        {
+          "name": "beneficiary_department_level_4",
+          "type": "String",
+          "description": "受益四级部门。项目归属的四级业务部门。"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "description": "项目状态，枚举值范围: [正常、异常]，正常-标识可用于出差和报销，异常-标识不可用于出差和报销"
+        },
+        {
+          "name": "approval_authority_matrix",
+          "type": "List<AuthorityMatrix>",
+          "description": "项目专属审批流。定义了该项目相关的BTA/ECA需要经过哪些特定角色的审批（如项目经理、PMO等）。",
+          "references": "AuthorityMatrix"
+        }
+      ]
+    },
+    {
+      "id": "project_monthly_expense_budget",
+      "name": "项目月度费用预算",
+      "type": "data",
+      "description": "项目月度费用预算是以项目为维度、以月为周期单位的费用管控基准，是项目的当月可使用费用额度上限，用于对项目当月费用进行总额管控，按照滚动预算控制方式，每月月初由运营人员设置项目当月预算资金。当员工提出出差申请或费用报销时，不能超出项目月度费用预算可用额度，成功提交后立即扣减预算可用额度。",
+      "relationship_description": "【项目月度费用预算】由【员工】在【AES系统】管理；【项目月度费用预算】关联【项目】（一对多）；【项目月度费用预算】属于【部门】（行政归属）",
+      "primary_key": "project_budget_id",
+      "properties": [
+        {
+          "name": "project_budget_id",
+          "type": "String",
+          "description": "项目月度费用预算ID，项目月度费用预算的唯一标识。"
+        },
+        {
+          "name": "project_code",
+          "type": "String",
+          "description": "项目编码，项目月度费用预算归属的项目编码。",
+          "references": "Project"
+        },
+        {
+          "name": "project_name",
+          "type": "String",
+          "description": "项目名称，项目月度费用预算归属的项目名称。",
+          "references": "Project"
+        },
+        {
+          "name": "start_date",
+          "type": "Date",
+          "description": "生效时间，项目月度费用预算的生效日期，通常为当月1号。"
+        },
+        {
+          "name": "end_date",
+          "type": "Date",
+          "description": "失效时间，项目月度费用预算的失效日期，通常为当月最后一天。"
+        },
+        {
+          "name": "total_budget_amount",
+          "type": "Double",
+          "description": "预算总额，运营人员配置的月度预算和上个月剩余预算的总和。"
+        },
+        {
+          "name": "used_budget_amount",
+          "type": "Double",
+          "description": "已用预算，审批通过的报销金额和未核销的出差申请预算总和。"
+        },
+        {
+          "name": "available_budget_balance",
+          "type": "Double",
+          "description": "可用预算总额，当员工报销和发起出差申请时，需要判断可用预算总额是否大于报销金额或者出差预算。"
+        }
+      ]
+    },
+    {
+      "id": "authority_matrix",
+      "name": "审批权签规则",
+      "type": "rule",
+      "description": "审批权签规则是费控系统的审批流程的配置信息，对于审批流程中的各节点的审批角色，配置其能审批的金额范围，若未配置，则该角色为审批流程的必经环节，若申请的金额在审批角色的权签范围内，则需要该角色审批，否则不需要该角色审批。系统根据此规则，在员工提交出差申请、差旅报销时自动生成审批节点路径，对超限额支出触发高级别审批。",
+      "relationship_description": "【审批权签规则】属于【项目】；",
+      "primary_key": "rule_id",
+      "properties": [
+        {
+          "name": "rule_id",
+          "type": "String",
+          "description": "权签规则唯一ID"
+        },
+        {
+          "name": "department_id",
+          "type": "String",
+          "description": "部门ID，权签规则的归属部门标识",
+          "references": "Department"
+        },
+        {
+          "name": "process_type",
+          "type": "String",
+          "description": "审批流程类型，枚举范围：[BTA出差申请、ECA报销申请]",
+          "references": "Department"
+        },
+        {
+          "name": "approve_role_code",
+          "type": "String",
+          "description": "员工角色，代表审批流程中审批节点的角色类型",
+          "references": "Employee"
+        },
+        {
+          "name": "approve_id",
+          "type": "String",
+          "description": "员工工号，代表审批人的员工工号",
+          "references": "Employee"
+        },
+        {
+          "name": "expense_type_category",
+          "type": "String",
+          "description": "费用大类。枚举值范围：'TRAVEL' (差旅), 'ENTERTAINMENT' (招待), 'TELECOM' (通讯), 'GENERAL' (日常报销)。不同的费用类型对应不同的额度。"
+        },
+        {
+          "name": "limit_amount",
+          "type": "Double",
+          "description": "审批金额上限，该角色能审批通过的最大金额（含）。超过此金额必须升级审批。为空代表无金额限制每次审批都需要经过该角色。"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "description": "币种，额度单位 (CNY, USD, HKD)。在比对单据金额时，必须先进行汇率换算对齐币种。"
+        }
+      ]
+    },
+    {
+      "id": "department",
+      "name": "部门",
+      "type": "data",
+      "description": "部门是企业内部承担成本、进行责任归属和费用核算的最基础组织单位。每个部门组织拥有唯一编码，关联上级组织、费用负责人及审批权限。项目月度费用预算申请、差旅申请、差旅报销均需绑定对应部门。部门组织结合出差申请或者差旅报销场景，可确定出差申请审批流程、差旅报销流程。",
+      "relationship_description": "【部门】包含【员工】（行政归属）；【部门】由【员工】管理（部门负责人）；【部门】（上级）下辖【部门】（下级）",
+      "primary_key": "department_id",
+      "properties": [
+        {
+          "name": "department_id",
+          "type": "String",
+          "description": "部门编码。部门在系统中的唯一身份识别码，与财务核算系统中的“成本中心代码”保持一致。"
+        },
+        {
+          "name": "department_name",
+          "type": "String",
+          "description": "部门名称"
+        },
+        {
+          "name": "organization_level",
+          "type": "String",
+          "description": "部门层级。指该部门在组织树中的深度（如一级部门代表集团业务群，四级部门就代表基层作业组）。该属性直接决定了审批权限的边界。例如，金额较大的报销可能需要自动升级到一级部门或二级部门的部门负责人审批。"
+        },
+        {
+          "name": "parent_department_id",
+          "type": "String",
+          "description": "上级部门编码。用于确定部门之间的父子关系。当本级部门因撤销或合并而无法承担费用时，系统可依据此属性将费用自动向上归集到父级部门。"
+        },
+        {
+          "name": "manager_employee_id",
+          "type": "String",
+          "description": "部门负责人ID。指该部门的行政主管。在涉及行政类审批（非项目经理审批）的场景中，系统会读取此字段来确定谁具有签字权",
+          "references": "Employee"
+        }
+      ]
+    },
+    {
+      "id": "business_travel_application",
+      "name": "BTA申请单",
+      "type": "data",
+      "description": "BTA申请单是员工在发生差旅行为前提交的预算单据，用来明确出差事由、行程规划及预计费用，记录的是出差预算的“预估金额”而非实际支出。BTA申请单主要用于差旅合规性预审、在线订票授权以及差旅报销单的费用核销，也用于与携程商旅平台对接实现免垫资订票，或在预算不足时触发超支预警，确保差旅支出不超预算。",
+      "relationship_description": "【BTA申请单】由【员工】提交;【BTA申请单】预算金额来源于【项目月度费用预算】;【ECA报销单】关联【BTA申请单】;【员工】（业务审批人）审批【BTA申请单】合理性;【员工】财务审核【BTA申请单】合规性;【BTA申请单】审批通过后产生【审批记录】",
+      "primary_key": "application_id",
+      "properties": [
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "出差申请单ID，是单据在系统中的唯一标识。在后续发起报销（ECA）或借款（Loan）时，必须引用此ID，以便系统关联原始的出差授权信息。"
+        },
+        {
+          "name": "applicant_employee_id",
+          "type": "String",
+          "description": "申请人工号。填写发起出差申请员工的唯一编号。系统通过该编号识别申请人身份，并自动执行风控检查，查看该员工名下是否有未还清的旧账（即\"前款不清\"）。如果有未核销的欠款，系统可能会根据规则限制本次操作。",
+          "is_foreign_key": true,
+          "references": "Employee"
+        },
+        {
+          "name": "cost_center_project_code",
+          "type": "String",
+          "description": "项目编码。定义了本次出差费用的项目承担主体。提交时，系统依据此编码去查找对应的项目月度费用预算进行扣减校验。",
+          "is_foreign_key": true,
+          "references": "Project"
+        },
+        {
+          "name": "estimated_total_cost",
+          "type": "Double",
+          "description": "预计差旅总费用。员工预估的本次出差总开销，系统会依据这个金额，预先冻结项目月度费用预算。"
+        },
+        {
+          "name": "billing_type",
+          "type": "String",
+          "description": "出差类型，枚举范围：[客户付费、非客户付费]，用于决定本次出差费用最终由公司承担还是客户承担"
+        },
+        {
+          "name": "travel_scope",
+          "type": "String",
+          "description": "出差范围，也叫“BTA类型”，枚举范围：[国内、国外]，用于区分本次行程是“国内出差”还是“国际出差”。是计算费用的基础逻辑开关，决定后续计算差旅补助时，是适用国内的人民币标准，还是适用国际的外币标准。"
+        },
+        {
+          "name": "start_date",
+          "type": "Date",
+          "description": "计划出差的开始日期。"
+        },
+        {
+          "name": "end_date",
+          "type": "Date",
+          "description": "计划出差的结束日期。"
+        },
+        {
+          "name": "origin_city",
+          "type": "String",
+          "description": "出发地城市。填写本次行程出发的具体城市"
+        },
+        {
+          "name": "destination_cities",
+          "type": "List<String>",
+          "description": "到达地城市。填写本次差旅行程的目标城市列表。不同级别的城市（如一线城市与三线城市）对应的差旅补助标准不同，系统将根据到达地城市，计算出员工每天可以领取的补助金额。"
+        },
+        {
+          "name": "is_corporate_flight_booking",
+          "type": "Boolean",
+          "description": "机票是否由公司代订。购买机票是否需要直接走公司账，如果为是，在BTA审批通过后，系统会自动向携程商旅平台推送授权，允许员工在携程商旅平台挂账预订机票，无需个人垫付资金。"
+        },
+        {
+          "name": "is_corporate_hotel_booking",
+          "type": "Boolean",
+          "description": "酒店是否由公司代订。预定酒店是否需要直接走公司账。如果为是，在BTA审批通过后，系统会自动向携程商旅平台推送授权，允许员工在携程商旅平台挂账预订酒店，无需个人垫付资金。"
+        },
+        {
+          "name": "has_expat_allowance",
+          "type": "Boolean",
+          "description": "是否涉及外派补助，如果为是，在BTA审批通过后，差旅外派补助信息将同步给HR系统，外派补助将随每月的工资统一发放。当后续发起ECA报销时，系统会禁用“差旅补助”的申报功能，防止补助重复领取。"
+        },
+        {
+          "name": "requested_loan_amount",
+          "type": "Double",
+          "description": "申请借款金额。需本次出差需要向公司预支的备用金金额。该金额不能超过预计的总差旅费用。系统会执行严格的信用检查：如果申请人名下仍有未还清的借款，系统将依据\"前款不清，后款不借\"的原则，阻断新的借款申请。"
+        },
+        {
+          "name": "flight_itineraries",
+          "type": "List<BTAFlightInfo>",
+          "description": "出差航程明细，记录员工出差时的出发地和到达地列表，用于向商旅平台推送机票预订授权的出发地、到达地",
+          "references": "BTAFlightInfo"
+        },
+        {
+          "name": "expense_budget_lines",
+          "type": "List<BTAFeeLine>",
+          "description": "出差预算的费用明细，员工在出差前填写的具体预算清单，如交通费-机票的预算金额和借款金额等",
+          "references": "BTAFeeLine"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "description": "出差申请单的状态，枚举范围：[草稿、待审核、挂起、退回补件、已支付、已完成、已关闭],标记出差申请单当前所处的流转状态。当状态为“已完成 ”时，单据正式生效，员工才能依据此单据购买机票或者预订酒店，以及出差结束后发起报销流程。"
+        }
+      ]
+    },
+    {
+      "id": "flight_itinerary",
+      "name": "BTA航程信息",
+      "type": "data",
+      "description": "BTA航程信息是员工出差申请中的每一段具体行程，包含员工出差申请时预订机票的出发地和到达地信息，仅在员工选择“机票预订”为公司结算时有效。主要用于在出差申请单审批完成后，系统将出发地、到达地等关键数据推送给携程商旅平台，从而限制员工购买机票的价格范围和航班路线，防止员工订购与出差任务无关的航线和超标预订。",
+      "relationship_description": "【BTA航程信息】属于【BTA申请单】",
+      "primary_key": "itinerary_id",
+      "properties": [
+        {
+          "name": "itinerary_id",
+          "type": "String",
+          "description": "航程信息ID，员工航程信息唯一ID"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "出差申请单号，关联的BTA申请单号，标识此航程信息归属的出差申请单。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "sequence_number",
+          "type": "Integer",
+          "description": "航程序号。用于标记多段航程的顺序。例如，为1时，标识“第1段”航程"
+        },
+        {
+          "name": "origin_city",
+          "type": "String",
+          "description": "航出发地。填写具体的起飞城市。携程商旅平台将依据此信息锁定可预订航班的出发站点。"
+        },
+        {
+          "name": "destination_city",
+          "type": "String",
+          "description": "航班到达地。填写具体的降落城市。商旅平台将依据此信息锁定可预订航班的目的站点，只有出发地和到达地都匹配时，员工才能成功预订机票。"
+        },
+        {
+          "name": "remarks",
+          "type": "String",
+          "description": "航程备注。用于补充说明该航段的特殊业务需求，例如是否需要中转、是否有指定的航空公司要求等。"
+        }
+      ]
+    },
+    {
+      "id": "estimated_expenseLine",
+      "name": "BTA预算明细项",
+      "type": "data",
+      "description": "BTA预算明细项是出差申请单中的预算子对象，包含本次差旅行程预估发生的各项具体开支（如机票、住宿、补助等），包含预算金额和借款金额。系统根据差旅标准对明细项中费用的合规性进行审查，作为借款或报销金额核定的参考依据。BTA预算明细项用于在出差申请阶段进行项目月度费用预算占用，确保各项费用支出不超出公司差旅标准，并在员工出差结束后，和实际提交报销单进行数据比对。",
+      "relationship_description": "【BTA预算明细项】属于【BTA申请单】;【机酒和补贴费用标准】约束【费用明细行】;",
+      "primary_key": "line_id",
+      "properties": [
+        {
+          "name": "line_id",
+          "type": "String",
+          "description": "费用明细行ID。费用明细的系统全局唯一标识"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "关联的BTA申请单号。指明这条费用明细属于哪一次出差申请。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "expense_category",
+          "type": "String",
+          "description": "费用类型。出差预算的实际用途。枚举范围：[在途交通-机票、在途交通-火车/轮船/大巴等、住宿费-宾馆、市内交通费-出租车/公交车等、住宿费-租房、签证费、保险费、差旅补助]。不同的费用类型对应不同的差旅政策要求。"
+        },
+        {
+          "name": "budget_amount",
+          "type": "Double",
+          "description": "预算金额,本比费用类型的差旅预估金额，包含了借款金额"
+        },
+        {
+          "name": "requested_loan_amount",
+          "type": "Double",
+          "description": "借款金额,员工希望公司提前打到收款账户的备用金。"
+        },
+        {
+          "name": "approved_loan_amount",
+          "type": "Double",
+          "description": "核定金额。当借款金额大于0时，财务审批通过后的最终确认数字。出纳将严格依据此金额执行付款操作。"
+        },
+        {
+          "name": "justification",
+          "type": "String",
+          "description": "详细描述。用于补充说明费用的用途、使用范围。例如填写“住宿5天，每天400元”或“往返机场打车费预估”。"
+        }
+      ]
+    },
+    {
+      "id": "travel_loan",
+      "name": "借款记录",
+      "type": "data",
+      "description": "借款记录是员工在出长差时，从项目月度费用预算中借款产生的借款单据，包含借款资金申请、付款、结清的记录，用于记录初始借款本金及动态变化的“未还余额”，并通过“借款状态”和“预计还款时间”，实现借款到期预警和逾期拉黑管控。“借款本金”（初始借款金额）与“未还余额”（随核销递减），借款记录通过“关联出差申请单号”连接出差申请单。借款记录在出纳打款后产生、员工报销时和借款对冲扣减，财务部门对长期挂账金额进行催收清理以及拉黑管控。",
+      "relationship_description": "【借款记录】属于【BTA申请单】，当发生借款时；【借款记录】属于【员工】；【ECA报销单】核销【借款记录】的借款金额。",
+      "primary_key": "loan_id",
+      "properties": [
+        {
+          "name": "loan_id",
+          "type": "String",
+          "description": "借款记录ID。借款记录的唯一编号。"
+        },
+        {
+          "name": "source_application_id",
+          "type": "String",
+          "description": "关联单据流水号。借款单关联出差申请单号。用于追溯借款来源。",
+          "references": "BTAApplication"
+        },
+        {
+          "name": "outstanding_balance",
+          "type": "Double",
+          "description": "未还余额。员工当前未清借款金额，借款时等于借款总额，员工报销一次或还一次，未还金额相应减少，为0时借款“结清”。"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "description": "借款状态。借款单当前的状态,枚举值：[审核中-标识未打款，正在走流程；已打款未结清-标识借款已到账，员工处于欠债状态；已核销-标识借款已清。已逾期-标识超过还款日未结清欠款，员工被拉入报销黑名单]。"
+        },
+        {
+          "name": "employee_id",
+          "type": "String",
+          "description": "借款人员工工号。",
+          "is_foreign_key": true
+        },
+        {
+          "name": "principal_amount",
+          "type": "Double",
+          "description": "借款本金总额，员工本次出差借款金额，不随核销和还钱动作变化。"
+        },
+        {
+          "name": "disbursement_date",
+          "type": "DateTime",
+          "description": "借款记账日期。出纳实际转账日期，时借款开始日期。"
+        },
+        {
+          "name": "repayment_due_date",
+          "type": "DateTime",
+          "description": "还款截止日期。公司规定的借款最后还款日。通常是出差结束后的3个月内，逾期员工被拉入报销黑名单。"
+        },
+        {
+          "name": "expected_repayment_date",
+          "type": "DateTime",
+          "description": "预计还款截止日期。员工发起出差申请时承诺的还款时间，由员工填写，但不能超过“还款截止日期”。"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "description": "币种。默认为CNY。涉及国际差旅时可能为外币。"
+        },
+        {
+          "name": "loan_category",
+          "type": "String",
+          "description": "借款类型。类型包含差旅借款、备用金借款，当前为差旅借款"
+        },
+        {
+          "name": "payment_timestamp",
+          "type": "DateTime",
+          "description": "借款到账实际。员工收款账户到账时间，精确到分秒。"
+        },
+        {
+          "name": "actual_payment_amount",
+          "type": "Double",
+          "description": "实际打款金额。"
+        }
+      ]
+    },
+    {
+      "id": "long_term_allowance",
+      "name": "BTA长差补贴",
+      "type": "data",
+      "description": "BTA长差补贴是针对员工在长期外派期间的住房、外派等经济补贴，补贴随薪资发放。BTA长差补贴包含通过业务审批的月度补贴额度及生效的时间范围，并作为数据指令推送至HR系统。",
+      "relationship_description": "【BTA长差补贴】属于【BTA申请单】；【BTA长差补贴】是【薪资系统】的输入数据；【BTA长差补贴】互斥【ECA短差补助】。",
+      "primary_key": "allowance_id",
+      "properties": [
+        {
+          "name": "allowance_id",
+          "type": "String",
+          "description": "长差补助主键ID。系统生成的唯一编号，标识补贴记录。"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "关联的BTA申请单编号。指明这条长差补助属于哪一次出差申请。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "monthly_allowance_rate",
+          "type": "String",
+          "description": "补助标准。明确员工每月补助金额,根据业务部门规定进行填写，并在出差申请时由业务审批人审批。例如显示“3000元/月"
+        },
+        {
+          "name": "effective_start_date",
+          "type": "Date",
+          "description": "补贴计算开始时间。HR系统计算薪资时，计发补贴的开始日期范围。"
+        },
+        {
+          "name": "effective_end_date",
+          "type": "Date",
+          "description": "补贴计算结束时间。HR系统计算薪资时，计发补贴的结束日期范围。"
+        }
+      ]
+    },
+    {
+      "id": "expense_claim",
+      "name": "ECA报销单",
+      "type": "data",
+      "description": "ECA报销单是员工出差结束后申请差旅费用报销及差旅补贴的申请，包括实际出差周期、费用明细项、出差补贴等。主要用于核验实际开支与申请事由的合规性，报销单审批完成后优先抵扣员工未还借款，并作为生成财务记账凭证的原始依据。ECA报销单的“报销总金额”代表差旅的总消费成本（含公司代支付部分），用于扣减项目月度费用预算，而不直接等同于员工实际收到的打款金额；ECA报销单必须关联出差申请单。",
+      "relationship_description": "【ECA报销单】消耗【项目月度费用预算】;【ECA报销单】关联【BTA申请单】;【ECA报销单】由【员工】提交;【ECA报销单】包含【ECA费用明细项】;【ECA报销单】包含【附件】;【ECA报销单】被【员工】审批;【ECA报销单】被【员工】财务审核;【ECA报销单】产生【审批记录】",
+      "primary_key": "claim_id",
+      "properties": [
+        {
+          "name": "claim_id",
+          "type": "String",
+          "description": "差旅报销单号。报销单的唯一标识。"
+        },
+        {
+          "name": "serial_number",
+          "type": "String",
+          "description": "流水号。用于财务系统凭证生成的唯一标识。"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "关联的出差申请单号。系统通过关联的出差申请单号的号码去调取出差申请单的审批信息，作为报销合规性比对的基准。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "applicant_id",
+          "type": "String",
+          "description": "差旅报销提单人工号。用来确定报销员工是谁。系统会根据报销人工号去查对应的员工有没有欠公司的钱，以便执行冲销。",
+          "is_foreign_key": true,
+          "references": "Employee"
+        },
+        {
+          "name": "applicant_name",
+          "type": "String",
+          "description": "员工姓名",
+          "references": "Employee"
+        },
+        {
+          "name": "hiring_location",
+          "type": "String",
+          "description": "招聘岗位地。用于辅助判断常驻地与出差地逻辑。"
+        },
+        {
+          "name": "personnel_number",
+          "type": "String",
+          "description": "E-HR编码。人事系统的ID，每个员工档案对应唯一编码"
+        },
+        {
+          "name": "job_title",
+          "type": "String",
+          "description": "员工职位，员工在人事档案中的行政官衔（比如：技术.咨询顾问.设计师，是员工在公司的岗位级别）。"
+        },
+        {
+          "name": "travel_grade",
+          "type": "String",
+          "description": "差旅等级，枚举值范围: [A, B, C, D]，直接决定出差可预定机票舱位和在不同城市出差时的酒店限额"
+        },
+        {
+          "name": "project_code",
+          "type": "String",
+          "description": "项目编码,项目在AES系统中的唯一标识。",
+          "is_foreign_key": true,
+          "references": "Project"
+        },
+        {
+          "name": "project_name",
+          "type": "String",
+          "description": "项目名称",
+          "references": "Project"
+        },
+        {
+          "name": "beneficiary_legal_entity",
+          "type": "String",
+          "description": "受益公司。指最终承担这笔费用的法人实体。"
+        },
+        {
+          "name": "beneficiary_department_level_1",
+          "type": "String",
+          "description": "受益一级部门"
+        },
+        {
+          "name": "beneficiary_department_level_2",
+          "type": "String",
+          "description": "受益二级部门"
+        },
+        {
+          "name": "beneficiary_department_level_3",
+          "type": "String",
+          "description": "受益三级部门"
+        },
+        {
+          "name": "beneficiary_department_level_4",
+          "type": "String",
+          "description": "受益四级部门"
+        },
+        {
+          "name": "business_group",
+          "type": "String",
+          "description": "业务集团指最高层级的业务板块归属（如：云智能业务集团、解放号业务集团）。这是老板看大盘盈亏时用的维度。"
+        },
+        {
+          "name": "actual_start_date",
+          "type": "Date",
+          "description": "实际开始日期。以实际票据时间为准，允许与BTA预计时间有少量偏差。"
+        },
+        {
+          "name": "actual_end_date",
+          "type": "Date",
+          "description": "实际结束日期。以实际票据时间为准，允许与BTA预计时间有少量偏差。"
+        },
+        {
+          "name": "departure_country",
+          "type": "String",
+          "description": "出发地"
+        },
+        {
+          "name": "arrival_country",
+          "type": "String",
+          "description": "到达地"
+        },
+        {
+          "name": "purpose",
+          "type": "String",
+          "description": "报销目的。解释差旅报销的费用用途和标记特殊事项。注意：这里的理由尽量跟BTA出差申请单里写的保持一致，不能申请时说“去见客户”，报销时变成了“去培训”。"
+        },
+        {
+          "name": "total_claim_amount",
+          "type": "Double",
+          "description": "报销总金额。是本次出差的消费总账。重要误区提示：不等于会收到的打款金额，而是包含了员工自己垫付的钱加上公司帮员工付的钱（如机票）。系统要用这个总数去扣减项目的预算。"
+        },
+        {
+          "name": "expense_lines",
+          "type": "list<ECAFeeLine>",
+          "description": "ECA费用明细项。员工需要把手里的每一张发票（机票行程单、酒店水单、打车票）逐一录入进去，形成一条条明细。每一行都要讲清楚花了多少钱、是不是专票、税率是多少。",
+          "references": "ECAFeeLine"
+        },
+        {
+          "name": "calculated_subsidy_amount",
+          "type": "Double",
+          "description": "差旅补贴。是系统算的标准价，根据员工的出差城市（一线/二线）和实际天数，使用公式算出来的补助金额。"
+        },
+        {
+          "name": "manual_adjustment_amount",
+          "type": "Double",
+          "description": "浮动补助。如果遇到特殊情况（比如在大山里出差没有发票，或者经特批增加了补助），可以在这里手动填入调整金额。"
+        },
+        {
+          "name": "subsidy_start_date",
+          "type": "String",
+          "description": "补贴计算开始时间。无论系统算多少、员工填多少，最后都要以财务审核确认的这个数字为准。"
+        },
+        {
+          "name": "subsidy_end_date",
+          "type": "String",
+          "description": "补贴计算结束时间。精确到半天，用来判定员工到补助时间。比如中午12点前回来算半天，12点后回来算一天。"
+        },
+        {
+          "name": "approved_subsidy_amount",
+          "type": "Double",
+          "description": "核定补助金额。由财务审核后确认的最终补助，补贴发放的实际金额。"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "description": "状态。差旅报销单的状态，枚举范围：[草稿、待审核、挂起、退回补件、已支付、已完成、已关闭]。"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "description": "创建时间"
+        },
+        {
+          "name": "submitted_at",
+          "type": "DateTime",
+          "description": "提交时间"
+        },
+        {
+          "name": "completed_at",
+          "type": "DateTime",
+          "description": "结束时间"
+        },
+        {
+          "name": "attachments",
+          "type": "list<attachment>",
+          "description": "附件。是财务用来证明报销的真实性的，必须上传的东西包括：发票的照片或扫描件、支付凭证（微信/支付宝截图）、领导同意的邮件截图等。没有附件，且财务无法核实真实性的，一律不予报销。",
+          "references": "Attachment"
+        }
+      ]
+    },
+    {
+      "id": "expense_line_item",
+      "name": "ECA费用明细项",
+      "type": "data",
+      "description": "ECA费用明细项是报销单下的最小费用核算单元，记录了出差期间产生的各类实际费用开支（如交通、住宿等），是财务审核合规性与计算税务抵扣的依据。主要用于校验费用发生时间是否在获批行程内，并将“申报金额”与差旅申请的“预算金额”进行对比，最终由财务核定实际可报销的金额。",
+      "relationship_description": "【ECA费用明细项】属于【ECA报销单】",
+      "primary_key": "line_id",
+      "properties": [
+        {
+          "name": "line_id",
+          "type": "String",
+          "description": "报销单费用明细行ID。系统自动生成的流水号ID，系统内唯一"
+        },
+        {
+          "name": "claim_id",
+          "type": "String",
+          "description": "关联的ECA报销单号。指明这条费用属于哪一张出差报销单",
+          "is_foreign_key": true,
+          "references": "ECAClaim"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "关联的BTA编号。指明费用对应的出差申请单。财务会依据这个编号去查看当初批准的出差预算，判断是否超支。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "expense_category",
+          "type": "String",
+          "description": "费用类型。出差发票的实际类型和用途，枚举范围：[在途交通-机票、在途交通-火车/轮船/大巴等、住宿费-宾馆、市内交通费-出租车/公交车等、住宿费-租房、签证费、保险费、差旅补助]。不同的费用类型对应不同的差旅政策要求。"
+        },
+        {
+          "name": "transaction_date",
+          "type": "Date",
+          "description": "费用发生时间。这笔消费具体的产生日期。系统会强制校验这个日期是否在BTA批准的出差时间段内。"
+        },
+        {
+          "name": "description",
+          "type": "String",
+          "description": "费用明细说明。员工填写的具体消费事由。"
+        },
+        {
+          "name": "original_currency",
+          "type": "String",
+          "description": "发票原始币种。发票上印的是什么货币（如人民币CNY、美元USD）。"
+        },
+        {
+          "name": "exchange_rate",
+          "type": "Double",
+          "description": "汇率。如果是外币发票，需要提供兑换成人民币的比例。"
+        },
+        {
+          "name": "claimed_amount",
+          "type": "Double",
+          "description": "折算后的申报金额（原始金额）。员工想要报销的原始金额。如果是人民币发票，就等于发票面额；如果是外币，就等于外币乘以汇率。"
+        },
+        {
+          "name": "approved_amount",
+          "type": "Double",
+          "description": "财务核定金额。由财务操作，为财务同意报销的钱。如果财务认为申报合理，这个数就等于申报金额；如果财务认为有水分，会进行核减，会小于申报金额。最终打款或抵扣欠款，都以这个数字为准。"
+        },
+        {
+          "name": "rejected_amount",
+          "type": "Double",
+          "description": "核减金额。这是被财务砍掉的钱。系统自动计算：申报金额减去核定金额。"
+        },
+        {
+          "name": "budget_reference_amount",
+          "type": "Double",
+          "description": "关联预算金额。这是当初在BTA里预计花的钱。系统将其展示在这里，仅供财务做参考对比，看看实际花费有没有严重超标。"
+        },
+        {
+          "name": "invoice_type",
+          "type": "String",
+          "description": "发票类型。标明发票的税务属性。如：增值税专票（可抵扣税额）、普票、定额发票等。这影响公司的税务抵扣计算。"
+        },
+        {
+          "name": "justification",
+          "type": "String",
+          "description": "详细描述。员工填写的补充说明。例如解释为什么这笔打车费特别贵（如\"深夜加班打车\"），以便财务判断合理性。"
+        }
+      ]
+    },
+    {
+      "id": "invoice",
+      "name": "发票",
+      "type": "data",
+      "description": "发票是报销流程中具备法律效力的原始消费凭证，用于证明支出的真实性、合规性并作为企业税务抵扣的依据。发票包含增值税发票、高铁票、机票等票据。发票用于对接税务系统进行票据验真、自动计算进项税抵扣额，以及通过校验商家黑名单来从源头防范财务合规风险，以及为员工差旅报销时提供报销费用明细支撑。",
+      "relationship_description": "【发票】属于【ECA费用明细项】；【发票】包含多个【附件】。",
+      "primary_key": "invoice_id",
+      "properties": [
+        {
+          "name": "invoice_id",
+          "type": "String",
+          "description": "发票ID。系统生成的全局唯一编号，用于精准锁定这一份具体的发票凭证。"
+        },
+        {
+          "name": "invoice_code",
+          "type": "String",
+          "description": "发票代码。区分各类发票的核心字段。发票认准代码和号码；火车票或行程单等票据认准其印刷的唯一票号。"
+        },
+        {
+          "name": "invoice_number",
+          "type": "String",
+          "description": "发票号码。凭证号码是打印在发票或者票据（行程单、车票等）上的唯一识别编号。对于发票，凭证号码指发票号码；对于高铁票或机票行程单等票据，凭证号码指印刷的票号。"
+        },
+        {
+          "name": "purchaser_title",
+          "type": "String",
+          "description": "发票抬头。指凭证上注明的购买方名称。对于发票类凭证：抬头必须是受益公司的法定全称，信息不符将导致财务审核驳回，对于高铁票、行程单等实名制票据。"
+        },
+        {
+          "name": "total_amount_inclusive_tax",
+          "type": "Double",
+          "description": "发票价税合计金额。发票价税合计金额是凭证上显示的最终支付总额，包含所有税费。该金额是财务核算的原始基准。系统规则要求，关联费用明细行的报销金额不得超过凭证金额。"
+        },
+        {
+          "name": "tax_rate",
+          "type": "String",
+          "description": "税率。对于增值税专用发票，税率由系统OCR直接识别。对于高铁票或行程单等特殊票据，系统将依据国家税务政策自动匹配法定的计算比例（如高铁票对应9%）。"
+        },
+        {
+          "name": "tax_amount",
+          "type": "Double",
+          "description": "税额。税额指凭证中包含的、准予抵扣的增值税款数额。该属性是财务系统核算进项税抵扣的核心数据。对于不显化税额的票据（如高铁票），系统将根据税率自动计算税额（税额 = 票面金额 / (1 + 适用税率) * 适用税率）。"
+        },
+        {
+          "name": "issue_date",
+          "type": "Date",
+          "description": "开票日期。开票日期是凭证上标注的开具时间。系统允许开票日期晚于业务发生日期（如事后补开发票），但开票日期必须在公司制度规定的报销有效期内，否则单据将被锁定或拦截。"
+        },
+        {
+          "name": "seller_name",
+          "type": "String",
+          "description": "销方名称。销方名称指提供商品或服务的商家名字。系统会将销方名称与内部风险库进行比对，用于识别是否存在黑名单企业或经营异常企业，从源头拦截潜在的合规风险。"
+        },
+        {
+          "name": "invoice_type",
+          "type": "String",
+          "description": "发票类型。凭证类型定义了报销证据的具体种类。可选值包括：增值税专用发票、增值税普通发票、定额发票、航空行程单、火车票等。凭证类型直接决定了系统调用的验真渠道以及税款抵扣的计算逻辑。"
+        },
+        {
+          "name": "verification_status",
+          "type": "String",
+          "description": "验真状态。验真状态记录了凭证在票夹系统校验后的结论。可选值包括：等待验真、验真成功、验真失败（假票风险）、重复报销（已在库中存在）。只有标记为“验真成功”的凭证，才具备进入后续审批流程的资格。"
+        },
+        {
+          "name": "verification_timestamp",
+          "type": "DateTime",
+          "description": "验真通过的时间。验真通过的时间记录了系统成功对接税务接口并获取真伪结论的确切时间戳。"
+        },
+        {
+          "name": "content_category",
+          "type": "String",
+          "description": "凭证内容分类。凭证内容分类记录了凭证上注明的具体消费项目（如住宿服务费、餐饮费）。凭证内容分类必须与出差报销单关联的费用明细项保持逻辑一致，防止员工使用餐饮发票报销住宿费用。"
+        },
+        {
+          "name": "expense_line_id",
+          "type": "String",
+          "description": "关联费用行ID。关联费用行ID用于将该凭证精准挂载到报销单中的某一项具体开支上。通过该ID，财务审核人员可以实现证据与账目的快速对账。",
+          "is_foreign_key": true
+        },
+        {
+          "name": "claim_id",
+          "type": "String",
+          "description": "关联报销单号。关联报销单号标明该凭证归属于哪一张具体的ECA报销申请单。",
+          "is_foreign_key": true
+        }
+      ]
+    },
+    {
+      "id": "short_term_allowance",
+      "name": "ECA短差补助",
+      "type": "data",
+      "description": "短差补助是员工在短期出差结束后，按公司政策获得的一定金额的补贴。短差补助主根据员工职级、出差城市来核定日补贴标准，根据财务核定的天数（支持半天）计算补贴金额，并结合实时汇率得到应发的人民币金额。",
+      "relationship_description": "【ECA短差补助】属于【ECA报销单】",
+      "primary_key": "allowance_id",
+      "properties": [
+        {
+          "name": "allowance_id",
+          "type": "String",
+          "description": "短差补助明细ID。系统生成的唯一编号，标识补贴记录。"
+        },
+        {
+          "name": "claim_id",
+          "type": "String",
+          "description": "关联ECA报销单编号。指明这条短差补助归属的出差报销单。",
+          "is_foreign_key": true,
+          "references": "ECAClaim"
+        },
+        {
+          "name": "start_time",
+          "type": "Date",
+          "description": "补助开始时间。补助开始时间用于计算差旅补助的起始时间，依据行程实际出发的时间或进入出差地境内的时刻确定。"
+        },
+        {
+          "name": "end_time",
+          "type": "Date",
+          "description": "补助结束时间。补助结束时间用于计算差旅补助的结束时间，依据行程返回出发地的时刻或离开出差地境内的时刻确定。"
+        },
+        {
+          "name": "country",
+          "type": "String",
+          "description": "出差国家，差旅行程的到达地国家"
+        },
+        {
+          "name": "city",
+          "type": "String",
+          "description": "出差城市，差旅行程的到达地国家对应城市"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "description": "补助原始币种。补助原始币种指补助标准定义时所采用的货币类型（如：人民币CNY、美元USD、欧元EUR等）。"
+        },
+        {
+          "name": "daily_rate",
+          "type": "Double",
+          "description": "日补助标准金额。员工每天可领取的固定津贴数额，由员工职级与出差目的地共同决定。"
+        },
+        {
+          "name": "approved_days",
+          "type": "Double",
+          "description": "核定补助天数。由财务进行操作，来核定补助天数。计算结果支持小数（如：5.5天），确保补助发放与实际在途时间精确对齐。"
+        },
+        {
+          "name": "total_amount_original",
+          "type": "Double",
+          "description": "补助原币总额。补助原币总额指未经汇率折算的补助原始总额。"
+        },
+        {
+          "name": "exchange_rate",
+          "type": "Double",
+          "description": "折算汇率。指将外币补助转化为人民币发放时采用的转化比例。系统统一抓取报销单提交当月公司财务部门发布的记账汇率；国内差旅该比例固定为 1.0。"
+        },
+        {
+          "name": "total_amount_converted",
+          "type": "Double",
+          "description": "折算金额。是最终换算为人民币（CNY）的金额，是系统应发放给员工的补助全额。"
+        },
+        {
+          "name": "final_approved_amount",
+          "type": "Double",
+          "description": "核定金额。是财务审核人员确认并签字的最终发放数额。在合规情况下，该数额与折算后的人民币金额相等。若财务审核判定行程存在异常，可在该属性中记录手动扣减后的结果。"
+        }
+      ]
+    },
+    {
+      "id": "document_attachment",
+      "name": "附件",
+      "type": "data",
+      "description": "附件是出差申请或差旅费用报销申请的辅助证明材料，用于存储如审批邮件、支付截图、合同协议等原始证据，为财务合规审计提供支撑，确保审批人员能够实时调阅证据。附件可用于在查看审批详情时，展示文件预览、作为外部审计的电子归档路径，以及通过文件类型的分类标记协助财务快速定位关键业务凭证。",
+      "relationship_description": "【出差申请】包含【附件】；【ECA报销单】包含【附件】；【发票】包含【附件】。",
+      "primary_key": "attachment_id",
+      "properties": [
+        {
+          "name": "attachment_id",
+          "type": "String",
+          "description": "附件ID，是附件唯一编号，系统为每一份上传的文件生成的独立识别码"
+        },
+        {
+          "name": "parent_object_id",
+          "type": "String",
+          "description": "关联的单据编号，指明附件归属的出差申请单或者出差报销单编号，可用于标识附件是否被单据关联，已被关联的附件不可在被其他单据关联。",
+          "is_foreign_key": true,
+          "references": "ECAClaim或者BTAApplication"
+        },
+        {
+          "name": "file_name",
+          "type": "String",
+          "description": "文件名。文件名记录了上传文件的原始名称，通常包含文件格式后缀（如 .pdf、.jpg、.eml 等）。"
+        },
+        {
+          "name": "category",
+          "type": "String",
+          "description": "附件类型。附件类型通过预设的分类标签标记文件的属性。常见的分类包括：审批邮件、支付凭证、合同协议、行程单、客户确认函等。分类有助于财务人员快速筛选关键证据。"
+        },
+        {
+          "name": "file_path",
+          "type": "String",
+          "description": "文件存储地址/下载链接。记录了附件在服务器上的物理存储路径或下载链接，用于在审批界面中实时预览或调阅文件内容。"
+        },
+        {
+          "name": "uploaded_at",
+          "type": "DateTime",
+          "description": "上传时间。记录了文件进入系统的确切时间点，作为审计追踪的重要时间证据。"
+        }
+      ]
+    },
+    {
+      "id": "reimbursement_blacklist",
+      "name": "报销黑名单",
+      "type": "data",
+      "description": "报销黑名单是企业针对差旅借款逾期未还员工设立的出差借款限制对象，主要用于记录违规类型（如欠款未还）及详细原因，并在审批流程中判断员工是否在黑名单中，从而自动拦截该员工的出差借款及报销申请。报销黑名单非永久封禁，而是动态管控，一旦违规事项结清并标记为“已解除”，系统将恢复其相关出差借款及报销申请权限。",
+      "relationship_description": "【报销黑名单】关联【员工】；【报销黑名单】控制【ECA报销单】报销提交；【报销黑名单】控制【BTA申请单】借款申请",
+      "primary_key": "record_id",
+      "properties": [
+        {
+          "name": "record_id",
+          "type": "String",
+          "description": "黑名单记录ID。"
+        },
+        {
+          "name": "employee_id",
+          "type": "String",
+          "description": "员工工号,是连接黑名单和员工本人的纽带。",
+          "is_foreign_key": true,
+          "references": "Employee"
+        },
+        {
+          "name": "employee_name",
+          "type": "String",
+          "description": "员工姓名。",
+          "references": "Employee"
+        },
+        {
+          "name": "violation_type",
+          "type": "String",
+          "description": "违规类型。明确员工的被加入黑名单的原因类别，比如是：保证金到期没收回、欠款到期未还等。"
+        },
+        {
+          "name": "violation_reason",
+          "type": "String",
+          "description": "详细原因。用来记录员工的被加入黑名单的详细原因，比如会写明：“2023年10月预付的房租至今没交发票”或者“某某项目的投标保证金超过3个月没退回”。"
+        },
+        {
+          "name": "effective_start_date",
+          "type": "Date",
+          "description": "生效时间。记录员工从哪一天开始被限制报销和借款权限。"
+        },
+        {
+          "name": "status",
+          "type": "String",
+          "description": "当前状态。系统在拦截借款或报销时，只看那些状态是“生效中”的记录；如果状态是“已解除”标识移出了黑名单。"
+        }
+      ]
+    },
+    {
+      "id": "corporate_travel_order",
+      "name": "商旅订单",
+      "type": "data",
+      "description": "商旅订单是企业通过外部平台携程商旅为员工统一预订机票或酒店后，商旅系统同步生成的消费记录对象，是实现企业代付支付与预算核算的关键凭据。商旅订单主要用于记录订单的类型、含税总额及行程摘要，并直接关联出差申请单以准确记录机票或酒店的实际消费金额。商旅订单用于财务与商旅平台的月度自动对账、监控员工是否在获批范围内进行预订，以及在报销环节自动导入消费数据以简化员工填报流程，费控系统每两天从商旅系统进行同步。",
+      "relationship_description": "【商旅订单】关联【BTA申请单】；",
+      "primary_key": "platform_order_id",
+      "properties": [
+        {
+          "name": "platform_order_id",
+          "type": "String",
+          "description": "商旅平台订单号。是唯一的订单身份证。商旅平台（如携程）给出的原始编号，用于精准对账。"
+        },
+        {
+          "name": "application_id",
+          "type": "String",
+          "description": "关联的BTA申请单编号，商旅订单归属的出差申请单号。",
+          "is_foreign_key": true,
+          "references": "BTAApplication"
+        },
+        {
+          "name": "order_category",
+          "type": "String",
+          "description": "订单类型。比如机票订单、酒店订单。"
+        },
+        {
+          "name": "total_amount",
+          "type": "Double",
+          "description": "订单含税总金额,包含税费的金额，用于从员工出差申请单的项目月度费用预算中扣除。"
+        },
+        {
+          "name": "currency",
+          "type": "String",
+          "description": "币种。默认为人民币（CNY）。"
+        },
+        {
+          "name": "booking_time",
+          "type": "DateTime",
+          "description": "订单发生时间，机票订单或者酒店订单的实际产生时间。"
+        },
+        {
+          "name": "traveler_name",
+          "type": "String",
+          "description": "出行人姓名，购买机票或者预订酒店的实际员工姓名。"
+        },
+        {
+          "name": "itinerary_summary",
+          "type": "String",
+          "description": "行程摘要。如“北京-上海”或“希尔顿酒店”。"
+        }
+      ]
+    },
+    {
+      "id": "ref_travel_standard",
+      "name": "机酒和补贴费用标准",
+      "type": "rule",
+      "description": "作为费用控制系统的机票、酒店预订“合规基础”，通过预设不同职级在不同城市的开支限额，实现从订票到报销的全流程费控。主要用于根据员工的差旅等级（如 A、B 级）和目的地城市类别（如北上广深），自动匹配其准许预订的机票舱位、酒店价格上限以及每日补助金额。",
+      "relationship_description": "【机酒和补贴费用标准】校验【ECA报销单】（费用封顶）;【机酒和补贴费用标准】校验【BTA申请单】（事前标准）",
+      "primary_key": "standard_id",
+      "properties": [
+        {
+          "name": "standard_id",
+          "type": "String",
+          "description": "差旅规则唯一标识 (e.g., STD-L1-TIER1)。"
+        },
+        {
+          "name": "travel_grade",
+          "type": "String",
+          "description": "差旅等级，枚举值范围: [A, B, C, D]，直接决定出差可预定机票舱位和在不同城市出差时的酒店限额",
+          "references": "Employee"
+        },
+        {
+          "name": "city_tier_category",
+          "type": "String",
+          "description": "出差城市等级，是城市等级分类。枚举值：['TIER_1'(北上广深), 'TIER_2'(省会), 'TIER_3'(其他)]。[AI指令]：需配合 [Ref_City_Index] 使用。若目的地不在索引中，默认降级为 TIER_3。"
+        },
+        {
+          "name": "accommodation_limit_cny",
+          "type": "Double",
+          "description": "住宿费上限，员工在出差城市能够预订的酒店最高价格。"
+        },
+        {
+          "name": "transport_class_policy",
+          "type": "String",
+          "description": "交通工具舱位标准。例如 'Economy Only', 'Business Class Allowed', 'Train_First_Class'。[AI指令]：用于校验机票/火车票行程单的舱位字段。"
+        },
+        {
+          "name": "daily_allowance_cny",
+          "type": "Double",
+          "description": "每日差旅补助金额。用于自动计算 ECA 报销单中的补助总额 (Days * Rate)。"
+        }
+      ]
+    },
+    {
+      "id": "approval_log",
+      "name": "审批记录",
+      "type": "data",
+      "description": "审批记录是费用控制业务流程中审批行为的数字化存证，用于追踪单据从发起至终审的完整流转轨迹，是审计合规与责任追溯的核心对象。审批记录主要用于记录审批人的身份（如项目经理、财务专员）、操作动作（如通过、驳回）及精确的时间戳，并通过“单据快照”锁定审批时刻的原始数据以防后期篡改。审批记录常用于在查看单据详情时展示流转历史、作为财务审计决策依据的还原，以及在系统进行合规复核时，比对当前数据与快照数据的一致性。",
+      "relationship_description": "【审批记录】关联【BTA申请单】；【审批记录】关联【ECA报销单】",
+      "primary_key": "log_id",
+      "properties": [
+        {
+          "name": "log_id",
+          "type": "String",
+          "description": "审批记录ID，审批操作的唯一标识符。"
+        },
+        {
+          "name": "object_id",
+          "type": "String",
+          "description": "关联单据ID，审批记录所对应的业务单据的编号",
+          "is_foreign_key": true,
+          "references": "BTAApplication或者ECAClaim"
+        },
+        {
+          "name": "object_type",
+          "type": "String",
+          "description": "关联单据类型。用于区分该记录属于哪种流程类型，枚举范围：[出差申请单、出差费用报销]。"
+        },
+        {
+          "name": "approver_id",
+          "type": "String",
+          "description": "审批人工号。执行审批动作的员工工号。",
+          "is_foreign_key": true,
+          "references": "Employee"
+        },
+        {
+          "name": "approver_name",
+          "type": "String",
+          "description": "审批人姓名。执行审批动作的员工姓名。",
+          "is_foreign_key": true,
+          "references": "Employee"
+        },
+        {
+          "name": "approver_role",
+          "type": "String",
+          "description": "审批时角色标签。是审批人在该节点所代表的业务身份，如直接主管、项目经理或财务专员。"
+        },
+        {
+          "name": "action",
+          "type": "String",
+          "description": "审批动作。用于记录审批人的操作结果，包括通过、驳回、财务挂起以及退回补件。"
+        },
+        {
+          "name": "action_timestamp",
+          "type": "DateTime",
+          "description": "审批操作时间。用于记录审批操作发生的精确日期与时间。"
+        },
+        {
+          "name": "comments",
+          "type": "String",
+          "description": "审批意见。审批人填写的具体意见或建议，用于记录审批决策的依据和理由。"
+        },
+        {
+          "name": "object_snapshot",
+          "type": "String",
+          "description": "单据快照。审批发生时刻单据数据的完整记录（JSON 格式），包含当时的金额、明细等字段，用于防止审批后的数据篡改校验。",
+          "is_foreign_key": false
+        }
+      ]
+    },
+    {
+      "id": "sensitive_words_library",
+      "name": "敏感词库",
+      "type": "data",
+      "description": "敏感词库是费用控制系统的合规“防火墙”，用于存储在出差申请和费用报销时，申请单或者报销单的备注信息中禁止出现的关键词，用于从源头规避财务合规风险与法律合规风险。敏感词库主要用于在员工提交单据时进行文本扫描，识别并拦截包含敏感信息的描述（如违规礼品、限制性业务等）。敏感词库用于单据提交前的实时校验提示。",
+      "relationship_description": "【敏感词库】校验【BTA申请单】是否合规；【敏感词库】校验【ECA报销单】是否合规",
+      "primary_key": "word_id",
+      "properties": [
+        {
+          "name": "word_id",
+          "type": "String",
+          "description": "敏感词唯一标识。系统生成的唯一编号。"
+        },
+        {
+          "name": "keyword",
+          "type": "String",
+          "description": "敏感关键词列表。具体的禁止词条，如“礼品卡”、“高尔夫”、“返利”等。"
+        },
+        {
+          "name": "risk_level",
+          "type": "String",
+          "description": "风险等级。枚举值：['HIGH'(直接拦截), 'MEDIUM'(人工核查), 'LOW'(风险预警)]。"
+        },
+        {
+          "name": "category",
+          "type": "String",
+          "description": "词库分类。用于区分词条性质，如：反贿赂合规、业务真实性、政治敏感等。"
+        },
+        {
+          "name": "replacement_suggestion",
+          "type": "String",
+          "description": "修正建议。当触发关键词时，系统给员工提供的标准化填写建议。"
+        },
+        {
+          "name": "is_active",
+          "type": "Boolean",
+          "description": "是否启用。标识该敏感词当前是否参与系统匹配校验。"
+        },
+        {
+          "name": "update_time",
+          "type": "DateTime",
+          "description": "最近更新时间。记录词库变更的时间点，用于审计追踪。"
+        }
+      ]
+    },
+    {
+      "id": "hr_system",
+      "name": "HR系统",
+      "type": "system",
+      "description": "HR系统是企业组织架构与人员信息的唯一数据源，同时也是薪酬计算的终端。在费控业务中，HR系统负责向费控输送准确的员工信息，以支撑审批流的构建；另一方面，费控系统中计算产生的员工随工资发放的补贴需回写至HR系统，以便合并计入员工当月薪酬发放。",
+      "relationship_description": "【HR系统】包含【员工】（数据源）；【HR系统】包含【部门】（数据源）；【HR系统】接收【BTA长差补贴】（薪资计算输入）；",
+      "primary_key": "system_code",
+      "properties": [
+        {
+          "name": "system_code",
+          "type": "String",
+          "description": "系统唯一标识。例如：'HR_CORE_01'。"
+        },
+        {
+          "name": "sync_status",
+          "type": "String",
+          "description": "数据同步状态。枚举值：[正常、异常、维护中]。用于监控费控能否正常获取人员主数据。"
+        },
+        {
+          "name": "last_sync_timestamp",
+          "type": "DateTime",
+          "description": "最后一次主数据同步时间。用于排查“新员工为何无法登录”等时效性问题。"
+        },
+        {
+          "name": "allowance_interface_url",
+          "type": "String",
+          "description": "补助数据接收接口地址。费控系统向此地址推送长差补助数据。"
+        },
+        {
+          "name": "api_version",
+          "type": "String",
+          "description": "接口版本号。确保费控调用的HR接口版本与对方系统保持一致。"
+        }
+      ]
+    },
+    {
+      "id": "expense_control_system",
+      "name": "费控系统",
+      "type": "system",
+      "description": "费控系统对象代表了本应用平台的全局配置与运行状态实体。它不存储具体的业务单据，而是存储控制业务流转的“元数据”。例如：当前的会计期间、全局报销开关（是否处于关账期）、当前生效的规则版本号（Ontology Version）以及系统公告。该对象通常作为单例（Singleton）存在，用于其他对象在执行逻辑校验时获取全局上下文。",
+      "relationship_description": "【费控系统】管理【BTA申请单】（全生命周期）；【费控系统】管理【ECA报销单】（全生命周期）；【费控系统】执行规则逻辑；",
+      "primary_key": "instance_id",
+      "properties": [
+        {
+          "name": "instance_id",
+          "type": "String",
+          "description": "实例ID。默认为 'EXPENSE_MASTER_PROD'。"
+        },
+        {
+          "name": "current_accounting_period",
+          "type": "String",
+          "description": "当前会计期间。例如 '2023-10'。用于判定跨期报销规则，早于此期间的单据可能被阻断或需特殊审批。"
+        },
+        {
+          "name": "is_system_maintenance",
+          "type": "Boolean",
+          "description": "是否维护模式。若为True，暂停所有提交和审批动作，仅允许查询。"
+        },
+        {
+          "name": "rule_engine_version",
+          "type": "String",
+          "description": "规则引擎版本。对应 Rules.json 中的版本号，如 'v3.3'。用于审计追踪当前使用的是哪一套合规策略。"
+        },
+        {
+          "name": "black_list_enabled",
+          "type": "Boolean",
+          "description": "黑名单功能开关。全局控制是否启用报销黑名单拦截逻辑。"
+        },
+        {
+          "name": "system_announcement",
+          "type": "String",
+          "description": "系统公告。显示在用户首页的提示信息，如“月底关账提醒”。"
+        }
+      ]
+    },
+    {
+      "id": "finance_system",
+      "name": "财务系统",
+      "type": "system",
+      "description": "财务系统是企业会计核算与资金支付的最终执行者。在费控流程中，当报销申请或差旅借款申请通过内部审批后，费控系统会将单据转换为“待支付指令”推送给财务系统。财务系统处理完成后，会回传凭证号和支付状态。该对象用于映射外部财务系统的科目配置、凭证生成规则及支付通道状态。",
+      "relationship_description": "【财务系统】接收【ECA报销单】（生成凭证）；【财务系统】接收【借款记录】（执行支付）；【财务系统】反馈支付状态给【费控系统】；",
+      "primary_key": "finance_system_code",
+      "properties": [
+        {
+          "name": "finance_system_code",
+          "type": "String",
+          "description": "系统标识。例如 'SAP_ERP_01'。"
+        },
+        {
+          "name": "account_subject_mapping_version",
+          "type": "String",
+          "description": "科目映射表版本。记录费控费用类型与财务会计科目的映射关系版本，确保入账准确。"
+        },
+        {
+          "name": "payment_gateway_status",
+          "type": "String",
+          "description": "银企直联状态。枚举值：[连通、断开]。用于判断出纳动作是否能自动执行打款。"
+        },
+        {
+          "name": "voucher_generation_mode",
+          "type": "String",
+          "description": "凭证生成模式。枚举值：[实时生成、批量夜间生成]。决定了员工在费控系统中看到“已支付”状态的延迟时间。"
+        },
+        {
+          "name": "legal_entity_list",
+          "type": "List<String>",
+          "description": "支持的法人实体列表。财务系统当前支持记账的公司主体代码列表。"
+        }
+      ]
+    },
+    {
+      "id": null,
+      "name": "票夹系统",
+      "type": "system",
+      "description": null,
+      "relationship_description": null,
+      "primary_key": null,
+      "properties": null
+    }
+  ]
+}

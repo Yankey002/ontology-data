@@ -1,0 +1,4383 @@
+{
+  "actions": [
+    {
+      "name": "Employee_configure_Project_budget",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "运营人员根据项目实际需求和AES系统数据，在费控系统中配置或调整项目预算。配置时需要输入项目编码、预算总额、生效日期等信息。系统会验证项目的有效性和运营人员的权限。配置完成后，该项目的员工就可以在预算范围内提交BTA申请。预算配置是费用管控的基础，确保支出有据可依。",
+      "target_objects": [
+        "Project_Monthly_Expense_Budget"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "EMPLOYEE_CONFIGURE_PROJECT_BUDGET_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "project_code",
+          "type": "String",
+          "required": true,
+          "description": "项目编码",
+          "source_object": "Project_Monthly_Expense_Budget.project_code"
+        },
+        {
+          "name": "total_monthly_budget_amount",
+          "type": "String",
+          "required": true,
+          "description": "月度预算总额",
+          "source_object": "Project_Monthly_Expense_Budget.total_monthly_budget_amount"
+        },
+        {
+          "name": "start_date",
+          "type": "String",
+          "required": true,
+          "description": "生效日期",
+          "source_object": "Project_Monthly_Expense_Budget.start_date"
+        }
+      ],
+      "triggered_event": [
+        "EMPLOYEE_CONFIGURE_PROJECT_BUDGET_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "更新项目月度预算总额"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "重新计算可用预算"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "记录配置审计轨迹"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Save_Bta_Draft",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工出差前在系统中创建BTA申请单，填写基本信息（如出差目的、时间、地点等），并保存。系统会生成唯一的申请单号，并将状态设置为草稿，此时申请单尚未提交进入审批，员工可以多次编辑和保存，直到信息完整后再正式提交。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SAVE_BTA_DRAFT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "SAVE_BTA_DRAFT_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Business Logic Validation",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_020",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在当BTA申请单中标记了“需公司预订酒店”时：1.明细完整性：至少包含一条费用类型为“住宿费”的费用明细。2.金额有效性：该住宿费明细的申请预算金额必须>0（建议：需大于城市基准价×0.5防止恶意填0）。3.逻辑一致性：若选择了“公司统付”，则该明细的预计支付方式必须自动锁定为“公司账户”，不可选“个人垫付”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_022_Uncertain",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在BTA申请单中申请的借款金额大于0时，系统必须检查该员工名下是否存在状态为未核销的借款记录（即借款余额大于0）。如果存在未还清的旧借款，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_080",
+              "enforcement_level": "NONE",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“借款金额”大于0时，如果当前操作账号（Operator）必须与单据申请人（Applicant）不一致，或者“预计还款时间”字段未填写，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_087",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“机票预定（公司结算）”为“是”，费用类型为“在途交通费-机票”的费用明细项的“借款金额”必须为0，提示“选择预定机票之后费用类型为在途交通费-机票时，不能进行借款！”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_091",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“酒店预订（公司结算）”为“是”，费用类型为“住宿费-宾馆”的费用明细项的“借款金额”必须为0，提示“选择预定酒店之后费用类型为住宿费时，不能进行借款！”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_096",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单，系统需检查所有费用类型为“住宿费-租房”的明细项。针对每一条租房明细，系统需执行比对校验：借款金额与预算金额。若借款金额超过了填写的预算金额，系统应阻断提交，并提示员工：租房费用的借款金额不得高于其预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_098",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)填写BTA申请单时，若费用明细项费用类型为“差旅补助”，关联行程的“到达地国家”为“中国”,借款金额必须为0。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_099_uncertain",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，若存在费用类型为“签证费”或“保险费”的项目，且借款金额必须为0"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_119",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交触发动作当员工提交BTA出差申请单时，逻辑校验检查该申请单对象的以下核心属性是否填写：出差时间(需包含开始日期与结束日期)；出差地点；出差目的；预计差旅费用；BTA类型；出差类型；是否单独开票回款；项目编码（项目名称自动带出）执行动作若上述任一属性缺失，阻断提交，并返回错误提示：“提交失败。申请单信息不完整，请补充以下必填项：[列出具体缺失的字段名]”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_122",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景包含“借款”的BTA出差申请单提交触发动作当员工提交BTA出差申请单时，逻辑执行1.合规校验：检查申请人名下是否存在状态为“未结清”的历史借款单（前清后借原则）若存在，判定为校验失败；2.路由计算：执行[全局权签路由计算]服务，传入以下参数：流程类型：固定为“BTA借款申请”；所属部门：读取项目所属部门；执行动作校验失败，若结果为空，判定为路由失败：若违反前清后借原则，阻断(Block)提交，并返回错误提示：“根据借款管理规定，必须结清前笔借款才能申请新借款。”；路由失败：阻断提交；路由成功：自动指定该单据的“借款审批人”并加入审批流。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_127",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（涉及高管职级）触发动作当员工提交BTA出差申请单且选择“飞机”或“火车一等座/软卧”时，逻辑执行1.政策宣导（系统）：前端界面展示高管差旅标准提示：“推荐优先乘坐火车。仅限集团总裁、CXO、LOB/LOF一级主副官等特定岗位可申请此标准”；2.资格人工核验（审批人）：审批人根据申请人的实际岗位和职级，判定其是否属于政策规定的“高管范围”，并确认交通工具选择的合理性（是否优先了火车）。执行动作放行提交：系统不校验具体的岗位映射关系，允许单据提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_128",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（交通工具含火车）触发动作当员工填写BTA出差申请单且选择了“火车一等座”或“软卧”时，逻辑执行1.政策提示（系统）：前端弹出总公司合规提示：“温馨提示：‘其他发文任命干部’仅允许预订火车二等座或硬卧，禁止预订一等座及软卧，请确认您的职级符合标准”；2.身份与席位人工核验（审批人）：审批人识别申请人是否属于“其他发文任命干部”序列，并校验其是否违规预订了高等级席位（一等座/软卧）。执行动作放行提交：系统不进行阻断（因无法自动识别干部身份），允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_130",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交（普通员工+飞机）触发动作当普通员工填写BTA出差申请单且交通工具选择“飞机”时，逻辑执行1.例外原因强制校验（系统）：系统强制要求填写“乘机原因”（如：无直达火车、折扣机票等），字段判空校验不通过则阻断；2.审批层级提示（系统）：前端弹出强提示：“普通员工乘机属于例外事项，根据政策，本单必须经由[LOB总裁]或[LOF总经理]审批通过方可执行，请确保后续审批流程包含上述人员”；3.资格与事由核验（审批人）：审批链上的主管需核实原因真实性，并确保单据流转至规定层级领导。执行动作放行提交：校验原因已填写后，允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为该例外申请已获授权；若流程未经过规定层级被驳回，则流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_138",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交并填写长差补助金额，触发动作当员工填写出差申请，时长在30天至90天之间且事由为“项目派驻/客户现场开发”时，逻辑执行1.特殊标记校验：检查是否勾选“申请长期出差”；2.凭证校验：检查是否上传关联的“LOB总裁/LOF总经理特批件”。执行动作判定长期：若勾选长期且附件齐全，系统将单据类型标记为“长期出差”并允许提交；若勾选长期但无附件，阻断提交并提示“未上传特批件，无法按长期出差申报”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_192",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若“涉及外派补助”为“是”，补助金额必须大于0，否则费控系统提示“补助金额未填”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_195",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若“涉及外派补助”为“是”，补助金额必须大于0，否则费控系统提示“补助金额未填”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_202",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若“多人合住”为是，合住人信息不能为空，否则系统阻断提交，提示“合住人信息为空”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_518",
+              "enforcement_level": "MUST",
+              "rule_content": "场景：当系统保存BTA航程信息时，如果出发城市或到达城市在重复城市列表中，系统应自动将其格式化为Country-City形式。逻辑：调用validDuplicatedCity，例如China-Beijing。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "CREATE",
+            "details": "创建BTA申请单状态草稿状态"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Submit_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工完成BTA申请单的必填信息填写后，正式提交申请进入审批流程。系统会执行严格的校验：检查申请信息的完整性和准确性、验证申请预算是否超过项目预算的可用额度、确认BTA非客户付费差旅申请单是否附带了必要的邮件审批附件。校验通过后，申请单状态变更为（待审批），并根据是否申请借款进入相应的审批流程。如果校验失败，系统会明确提示错误原因，要求员工修正后重新提交。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SUBMIT_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "SUBMIT_BTA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity Check (数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_020",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在当BTA申请单中标记了“需公司预订酒店”时：1.明细完整性：至少包含一条费用类型为“住宿费”的费用明细。2.金额有效性：该住宿费明细的申请预算金额必须>0（建议：需大于城市基准价×0.5防止恶意填0）。3.逻辑一致性：若选择了“公司统付”，则该明细的预计支付方式必须自动锁定为“公司账户”，不可选“个人垫付”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_080",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“借款金额”大于0时，如果当前操作账号（Operator）必须与单据申请人（Applicant）不一致，或者“预计还款时间”字段未填写，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_119",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交触发动作当员工提交BTA出差申请单时，逻辑校验检查该申请单对象的以下核心属性是否填写：出差时间(需包含开始日期与结束日期)；出差地点；出差目的；预计差旅费用；BTA类型；出差类型；是否单独开票回款；项目编码（项目名称自动带出）执行动作若上述任一属性缺失，阻断提交，并返回错误提示：“提交失败。申请单信息不完整，请补充以下必填项：[列出具体缺失的字段名]”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_122",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景包含“借款”的BTA出差申请单提交触发动作当员工提交BTA出差申请单时，逻辑执行1.合规校验：检查申请人名下是否存在状态为“未结清”的历史借款单（前清后借原则）若存在，判定为校验失败；2.路由计算：执行[全局权签路由计算]服务，传入以下参数：流程类型：固定为“BTA借款申请”；所属部门：读取项目所属部门；执行动作校验失败，若结果为空，判定为路由失败：若违反前清后借原则，阻断(Block)提交，并返回错误提示：“根据借款管理规定，必须结清前笔借款才能申请新借款。”；路由失败：阻断提交；路由成功：自动指定该单据的“借款审批人”并加入审批流。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_130",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交（普通员工+飞机）触发动作当普通员工填写BTA出差申请单且交通工具选择“飞机”时，逻辑执行1.例外原因强制校验（系统）：系统强制要求填写“乘机原因”（如：无直达火车、折扣机票等），字段判空校验不通过则阻断；2.审批层级提示（系统）：前端弹出强提示：“普通员工乘机属于例外事项，根据政策，本单必须经由[LOB总裁]或[LOF总经理]审批通过方可执行，请确保后续审批流程包含上述人员”；3.资格与事由核验（审批人）：审批链上的主管需核实原因真实性，并确保单据流转至规定层级领导。执行动作放行提交：校验原因已填写后，允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为该例外申请已获授权；若流程未经过规定层级被驳回，则流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_077",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果机票预订（公司结算）选择了是，如果没有填写机酒和补贴费用标准，或者行程备注”字段为空，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_085",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果费用明细项的“备注”字段包含敏感词库信息，比如包含：“奖”、“礼品”、“礼物”、“送礼”、“公关”、“津贴”、“预付卡”，系统应阻断提交，并提示“详细描述中不得出现：奖、礼品、礼物、送礼、公关、津贴、红包、预付卡等敏感字眼”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_202",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若“多人合住”为是，合住人信息不能为空，否则系统阻断提交，提示“合住人信息为空”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_518",
+              "enforcement_level": "SHOULD",
+              "rule_content": "场景：当系统保存BTA航程信息时，如果出发城市或到达城市在\"重复城市列表\"中，系统应自动将其格式化为\"Country-City\"形式。逻辑：调用validDuplicatedCity，例如\"China-Beijing\""
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Financial Compliance Check (财务合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_022",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在BTA申请单中申请的借款金额大于0时，系统必须检查该员工名下是否存在状态为未核销的借款记录（即借款余额大于0）。如果存在未还清的旧借款，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_087",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“机票预定（公司结算）”为“是”，费用类型为“在途交通费-机票”的费用明细项的“借款金额”必须为0，提示“选择预定机票之后费用类型为在途交通费-机票时，不能进行借款！”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_091",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“酒店预订（公司结算）”为“是”，费用类型为“住宿费-宾馆”的费用明细项的“借款金额”必须为0，提示“选择预定酒店之后费用类型为住宿费时，不能进行借款！”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_096",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单，系统需检查所有费用类型为“住宿费-租房”的明细项。针对每一条租房明细，系统需执行比对校验：借款金额与预算金额。若借款金额超过了填写的预算金额，系统应阻断提交，并提示员工：租房费用的借款金额不得高于其预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_098",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)填写BTA申请单时，若费用明细项费用类型为“差旅补助”，关联行程的“到达地国家”为“中国”,借款金额必须为0。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_099_uncertain",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，若存在费用类型为“签证费”或“保险费”的项目，且借款金额必须为0。（保险费需要根据员工的入职时长以及公司是否给员工缴纳保险费来判断是否允许借款）"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_138",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交并填写长差补助金额，触发动作当员工填写出差申请，时长在30天至90天之间且事由为“项目派驻/客户现场开发”时，逻辑执行1.特殊标记校验：检查是否勾选“申请长期出差”；2.凭证校验：检查是否上传关联的“LOB总裁/LOF总经理特批件”。执行动作判定长期：若勾选长期且附件齐全，系统将单据类型标记为“长期出差”并允许提交；若勾选长期但无附件，阻断提交并提示“未上传特批件，无法按长期出差申报”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_192",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若“涉及外派补助”为“是”，补助金额必须大于0，否则费控系统提示“补助金额未填”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_021",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在BTA申请单中“机票预订（公司结算）”选择了是，如果BTA预算明细项中没有录入了费用类型为“在途交通费-机票”的费用信息，或者预算金额为0，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_079_A",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，系统读取当前单据的“预计差旅总费用”，并比对关联项目的项目预算实时可用余额。若“预计差旅总费用”>“项目可用余额”，阻断提交并提示“当前项目可用预算不足，请联系项目经理追加预算或调整差旅计划”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_079_B",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，系统读取当前单据的“申请借款金额”与“预计差旅总费用”。若“申请借款金额”>“预计差旅总费用”，阻断提交并提示“申请借款金额不能大于预计差旅总费用，请减少借款金额或选择个人垫付”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_089",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工执行此动作时，系统需遍历所有行的借款类型的BTA预算明细项。针对每一项，系统需比对两项数值：借款金额与预算金额（预估费用）。若发现任一明细项的借款金额超过了该项填写的预算金额，系统应阻断提交，并提示“借款金额不能大于预算金额！”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_094",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果“酒店预订（公司结算）”为“否”，费用类型为“住宿费-宾馆”的费用明细项的借款金额如果大于出差天数乘以该城市该职级住宿标准，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_131",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（填写预计市内交通费）触发动作当员工在BTA出差申请单中填写“预计市内交通费”且金额大于0时，逻辑执行1.政策宣导（系统）：前端在金额输入框旁提示：“政策要求：本地交通优先选择公共交通（机场巴士、地铁等）。如不能直达，建议采取‘出租车+公共交通’结合方式”；2.预算合理性核验（审批人）：审批人根据出差目的地城市的交通发达程度及业务紧急性，判定申请的“预计市内交通费”总额是否合理。执行动作放行提交：系统不限制具体金额，允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为该预算合理；若审批人认为预算过高且违背公共交通优先原则，予以拒绝或削减预算。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_137",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交,并填写长差补助金额，触发动作当员工填写完“开始日期”与“结束日期”并提交时，逻辑执行1.时长计算（系统）：计算出差总天数（Duration=结束日期-开始日期+1）；2.判断长差（系统）：判断（总天数>90天），判定为长差。执行动作不是长差：阻断提交，并提示：“本次行程不超过3个月，不属于长期派驻，不允许提长差”；是长差：允许提交"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_167",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景长期出差补贴发放触发动作提交BTA申请单，为填写长差租房补贴逻辑执行1.填写ECA报销申请，提供发票和填写补助金额2.人工操作：审核长差补助金额和长期租房发票和合同合规性执行动作若审核通过：通过报销，由出纳打款，若不通过：驳回，提示“按要求填写长差租房补贴金额和提供发票和合同，重新提交申请单”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_191",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单时，费控系统自动从财务系统查询员工未结清借款总额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_196",
+              "enforcement_level": "MUST",
+              "rule_content": "员工（提单人）提交BTA申请单后，费控系统自动扣减项目预算的可用预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_199",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单时，BTA预算明细项中费用类型为住宿费-租房的预算金额，不得超过规定的租房标准限额"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_235",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单，如果BTA预算明细项中存在借款金额大于0元，同时BTA申请单的填写时间晚于BTA申请单的出差结束时间（即先出差后补单），费控系统禁止申请借款。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_195",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）填写BTA申请单时，费控系统自动调用携程商旅接口获取机票价格，费控系统根据携程价格校验机票预算金额是否超出当前最高价格，如果超标提示“机票价格超出当前合理范围”。"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "Policy Compliance Check (政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_127",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（涉及高管职级）触发动作当员工提交BTA出差申请单且选择“飞机”或“火车一等座/软卧”时，逻辑执行1.政策宣导（系统）：前端界面展示高管差旅标准提示：“推荐优先乘坐火车。仅限集团总裁、CXO、LOB/LOF一级主副官等特定岗位可申请此标准”；2.资格人工核验（审批人）：审批人根据申请人的实际岗位和职级，判定其是否属于政策规定的“高管范围”，并确认交通工具选择的合理性（是否优先了火车）。执行动作放行提交：系统不校验具体的岗位映射关系，允许单据提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_128",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（交通工具含火车）触发动作当员工填写BTA出差申请单且选择了“火车一等座”或“软卧”时，逻辑执行1.政策提示（系统）：前端弹出总公司合规提示：“温馨提示：‘其他发文任命干部’仅允许预订火车二等座或硬卧，禁止预订一等座及软卧，请确认您的职级符合标准”；2.身份与席位人工核验（审批人）：审批人识别申请人是否属于“其他发文任命干部”序列，并校验其是否违规预订了高等级席位（一等座/软卧）。执行动作放行提交：系统不进行阻断（因无法自动识别干部身份），允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_125",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（交通工具非火车）触发动作当员工填写BTA出差申请单且交通工具选择“飞机”时，逻辑执行1.政策提示（系统）：系统前端弹出“5小时铁路圈”政策提示，要求员工确认合规性；2.人工判定（人）：单据流转至审批人，由审批人基于常识或查询12306，判定该路线是否属于“5小时铁路圈”及是否有特殊事由。执行动作放行提交：系统不进行硬性阻断，允许单据提交至审批流；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_126",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景BTA申请单提交（交通工具包含火车）触发动作当员工填写BTA出差申请单且交通工具选择“火车/高铁”时，逻辑执行1.席别自检（系统）：若员工选择了“卧铺（硬卧/软卧）”，系统前端弹出合规提示：“根据政策，仅夕发朝至或车程超过8小时方可预订卧铺，请确认您的行程符合要求”；2.人工判定（审批人）：单据流转至审批人，由审批人基于行程常识判定车程是否符合“>8小时”或“夕发朝至”的标准。执行动作放行提交：系统记录员工的选择，不进行阻断，允许提交审批；最终裁决业务审批人审批结果：若业务审批人批准，系统视为合规；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_129",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交（交通工具含飞机或高等级席别）触发动作当员工填写BTA出差申请单且选择了“飞机”或“火车一等座/软卧”时，逻辑执行1.违规风险提示（系统）：前端检测到交通工具超出普通员工标准，弹出强提示：“当前选择（飞机/一等座/软卧）超出普通员工差旅标准（默认仅限火车二等座/硬卧）。如无特殊紧急事由，请调整为合规席位”；2.合规性人工裁决（审批人）：审批人需严格审核申请人身份及超标理由（如：紧急公关、无票等）。执行动作放行提交：系统不进行硬性阻断，允许单据流转；最终裁决业务审批人审批结果：若业务审批人批准，系统视为“特批通过”；若业务审批人拒绝，流程终止。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_139",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请（事由=培训）触发动作提交时逻辑执行1.识别申请人所属机构是否为分支机构；2.识别目的地是否为总部；3.计算行程时长是否超过30天。执行动作满足条件：自动标记为长期出差，适用相应标准；否则：按短期差旅处理。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_140",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请触发动作提交时逻辑执行1.排除所有长期出差判定条件（时长<=30天，或30-90天无特批，或非分支机构培训）。执行动作默认标记为“短期出差”。"
+            }
+          ]
+        },
+        {
+          "order": "4",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_120",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景需要获取流程的权签信息输入定义接收参数：1.target_dept_id(部门ID)；2.process_type_code(流程代码，如'BTA','ECA')。逻辑运算1.在Object:Authority_Matrix中执行精确查找；2.匹配条件：Matrix.department==target_dept_idANDMatrix.process_type==process_type_code；3.获取结果：提取匹配行中的审批人工号，姓名，及审批节点顺序信息。输出定义返回审批人对象列表。若无匹配记录，返回NULL。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_121",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单提交触发动作当员工提交BTA出差申请单时，逻辑执行执行[全局权签路由计算]服务，传入以下定参：流程类型：固定为：BTA出差申请；所属部门：读取申请单所关联项目的所属部门。执行动作路由成功：系统根据服务返回的结果，自动指定该单据的当前审批人。路由失败：若全局服务返回空值（即该部门未配置BTA审批人），阻断(Block)提交，并返回错误提示：“提交失败。系统未找到该项目所属部门的差旅审批配置。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_166",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差补贴发放触发动作提交BTA申请单时，选择长差租房补贴逻辑执行1.汇总租房津贴与补助；2.人工操作：现在邮件同步到人资部门执行动作人资部门推送至薪酬系统合并计税，无需发票报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_300",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交BTA申请单后，报销单状态变更为“审批中”；"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_519",
+              "enforcement_level": "SHOULD",
+              "rule_content": "场景：当员工对BTA申请单（BTA类型为国外）进行提交时，如果任一航段的起止国相同（无跨境行为），系统应禁止。逻辑：跨境强校验，必须包含跨境行为"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_164",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房备案触发动作上传合同时逻辑执行1.人工/OCR校验：签署方是否为“公司”。执行动作若为公章签署：阻断（应以个人名义签署），提示“禁止使用公司名义签订长租合同”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_186",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景审批流转触发动作审批ECA报销单，系统分配审批人时逻辑执行1.检查整个单据审批链路上，除提交人外，是否包含其他人员；2.检查职位是否是CEO。执行动作若审批链路上除提交人外，不包含其他人员且提交人不为CEO：阻断，提示“不能审批自己的申请单，无法提交审批”"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为待审批"
+          },
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "CREATE",
+            "details": "启动BTA审批流程"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "冻结BTA申请金额对应的预算额度"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Withdraw_Application",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工提交BTA申请单后，在审批流程尚未结束（即状态为“待审批”）之前，如果发现信息填写错误或出差计划取消，可以主动撤回申请。撤回操作会立即终止当前的审批流程，并将申请单状态恢复为（草稿），同时释放之前冻结的项目预算额度。撤回后，员工可以修改申请单并重新提交，或者直接将其删除。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "WITHDRAW_APPLICATION_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "WITHDRAW_APPLICATION_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_522",
+              "enforcement_level": "MUST",
+              "rule_content": "场景：当员工对BTA申请单进行撤销时，如果财务已审批通过，系统应禁止撤销。逻辑：finApproverFlag=='1'时不可撤销。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为草稿"
+          },
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "DELETE",
+            "details": "终止BTA审批流程"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "释放被冻结的预算额度"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Close_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "当出差行程结束且所有相关业务处理完毕（如报销完成、借款结清）后，或者因故取消出差计划且不再需要该申请单时，员工或系统管理员可以执行关闭操作。关闭操作是将BTA申请单标记为（已关闭）状态，意味着该单据的生命周期彻底结束，不可再进行任何编辑、提交或审批操作。如果单据关联了未使用的预算额度，关闭操作会自动释放这些额度。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "CLOSE_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "CLOSE_BTA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为已关闭"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "释放该BTA剩余未使用的预算额度"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Del_Bta_Draft",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工可以删除状态为（草稿）的BTA申请单。这通常发生在员工创建了错误的申请单或者出差计划完全取消且无需保留记录的情况下。删除操作是物理删除或逻辑软删除（取决于系统实现），一旦删除，该申请单的所有信息将无法恢复。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "DEL_BTA_DRAFT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "DEL_BTA_DRAFT_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "DELETE",
+            "details": "删除BTA申请单记录"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Leader_Approve_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "业务审批人（通常是项目经理或部门主管）收到待审批的BTA申请单后，根据项目情况和差旅政策进行审核。如果审批通过，审批人需给出同意意见。审批通过后，根据流程定义，单据可能会流转到下一级审批人（如财务）或直接变更为（待借款/已完成）状态。审批通过意味着业务主管确认该出差行为是必要且合理的。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LEADER_APPROVE_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "审批意见",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "LEADER_APPROVE_BTA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Business Logic Validation",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_197",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单审批通过后，费控系统将BTA申请单中的差旅行程的人员差旅信息酒店预算同步给商旅系统，员工预订酒店时不能超过酒店预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_214",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（业务审批人）通过BTA申请单流程后，若申请单BTA预算明细项中存在借款金额大于0元的费用类型，需要转财务审核。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_194",
+              "enforcement_level": "MUST",
+              "details": "当BTA申请单在员工（业务审批人）审批结束后，如果BTA申请单的机票预订或者酒店预订选择“公司结算”，费控系统自动将行程信息同步至携程商旅。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_124",
+              "enforcement_level": "MUST",
+              "details": "适用场景BTA申请单审批阶段触发动作当审批人审批BTA出差申请单时，逻辑执行人工验证：审批人查看出差目的、预算等信息，结合部门业务实际情况，主观判定本次申请的合理性。执行动作批准：若判定合理，审批人点击‘批准’，流程流转；拒绝：若判定不合理，审批人点击‘拒绝’，系统强制要求填写‘拒绝原因’（必填项），并将单据退回给申请人。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单审批状态"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录审批操作日志"
+          },
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "若后续无审批节点，状态变更为待借款或已通过"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Leader_Reject_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "业务审批人如果认为BTA申请单不合理（如出差必要性不足、预算超标且无正当理由等），可以执行驳回操作。驳回时必须填写驳回原因。驳回后，申请单状态变更为（已驳回），流程终止。系统会自动释放之前冻结的项目预算，并通知申请人。申请人可以根据驳回意见修改后重新提交。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LEADER_REJECT_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "驳回原因",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "LEADER_REJECT_BTA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_124",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA申请单审批阶段触发动作当审批人审批BTA出差申请单时，逻辑执行人工验证：审批人查看出差目的、预算等信息，结合部门业务实际情况，主观判定本次申请的合理性。执行动作批准：若判定合理，审批人点击‘批准’，流程流转；拒绝：若判定不合理，审批人点击‘拒绝’，系统强制要求填写‘拒绝原因’（必填项），并将单据退回给申请人。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为已驳回"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "释放被冻结的预算额度"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录审批驳回日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Approve_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务专员对涉及借款的BTA申请单进行财务合规性审核。审核重点包括借款金额是否合理、是否存在未清借款等。财务审核通过后，单据状态变更为（待支付），并生成借款记录推送给财务系统进行打款。如果是无借款的申请，财务审核通过后单据即流转完成。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_APPROVE_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "审批意见",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_APPROVE_BTA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_197",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单审批通过后，费控系统将BTA申请单中的差旅行程的人员差旅信息酒店预算同步给商旅系统，员工预订酒店时不能超过酒店预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_193",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单审批结束后，如果BTA申请单的“涉及外派补助”为是，费控系统自动将外派补助数据同步至HR系统，外派补助将按月随工资发放。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_198",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单被员工（业务审批人）审批通过后，如果BTA申请单的付费类型为非客户付费，同时BTA预算明细项中借款金额都为0元，跳过员工（财务专员）审批。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_194",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单在员工（业务审批人）审批结束后，如果BTA申请单的机票预订或者酒店预订选择“公司结算”，费控系统自动将行程信息同步至携程商旅。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_081",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果员工填写的还款时间与出差结束时间对比大于3个月，系统阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_086",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，发现费用明细项备注中包含了“维护费”、“专项支出”等模糊词汇，财务人员不得执行同意操作，应执行驳回BTA申请单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_088",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，若借款费用明细项的费用类型为在公司代订的途交通费-机票，财务人员不得执行同意操作，而应执行驳回BTA申请单。\n"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_097",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，若费用类型为“住宿费-租房”且借款金额>0，需执行以下复核：资金用途核查：结合附件（租房意向书/合同草案/邮件说明），确认借款用途。若发现借款用于**“支付押金”或合同注明“公司对公转账”，严禁通过，必须驳回**；大额特批核查：若借款金额>4800元/月，必须检查附件中是否包含**超标特批邮件。若无特批文件，必须驳回**并提示员工‘超过4800元额度需上传特批邮件’。”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_201",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审批时，若BTA申请单的BTA预算明细项中，费用类型为“住宿费-租房”或者“住宿费-宾馆”的借款金额或者预算金额超出差旅标准，但BTA申请单的业务审批人审批意见包含同意超标的内容，员工（财务专员）审批时，“住宿费-租房”或者“住宿费-宾馆”费用超标不驳回差旅申请。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为待支付或已通过"
+          },
+          {
+            "object_type": "Travel_Loan",
+            "action": "CREATE",
+            "details": "生成借款记录（若有借款）"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务审批日志"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "Expense_Ontology_Rule_123",
+            "rule_content": "适用场景BTA借款发放触发动作财务/出纳确认借款发放（点击“确认支付”）逻辑执行1.生成借款记录：在Object:Travel_Loan中创建新记录，状态为“已发放”；2.关联更新：更新BTA申请单状态为“已借款”；3.记账：调用财务系统接口生成凭证（借：其他应收款，贷：银行存款）。执行动作数据写入成功后，向员工发送“借款到账通知”。"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Reject_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务专员在审核中发现严重违规问题（如借款金额明显异常、员工存在不良信用记录等），可以驳回BTA申请单。驳回逻辑与业务驳回类似，单据状态变为（已驳回），释放预算，并通知员工。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_REJECT_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "驳回原因",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_REJECT_BTA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Business Logic Validation",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_198",
+              "enforcement_level": "MUST",
+              "rule_content": "当BTA申请单被员工（业务审批人）审批通过后，如果BTA申请单的付费类型为非客户付费，同时BTA预算明细项中借款金额都为0元，跳过员工（财务专员）审批。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_081",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交BTA申请单时，如果员工填写的还款时间与出差结束时间对比大于3个月，系统阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_086",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，发现费用明细项备注中包含了“维护费”、“专项支出”等模糊词汇，财务人员不得执行同意操作，应执行驳回BTA申请单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_088",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，若借款费用明细项的费用类型为在公司代订的途交通费-机票，财务人员不得执行同意操作，而应执行驳回BTA申请单。\n"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_097",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对BTA申请单进行核验时，若费用类型为“住宿费-租房”且借款金额>0，需执行以下复核：资金用途核查：结合附件（租房意向书/合同草案/邮件说明），确认借款用途。若发现借款用于**“支付押金”或合同注明“公司对公转账”，严禁通过，必须驳回**；大额特批核查：若借款金额>4800元/月，必须检查附件中是否包含**超标特批邮件。若无特批文件，必须驳回**并提示员工‘超过4800元额度需上传特批邮件’。”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_201",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审批时，若BTA申请单的BTA预算明细项中，费用类型为“住宿费-租房”或者“住宿费-宾馆”的借款金额或者预算金额超出差旅标准，但BTA申请单的业务审批人审批意见包含同意超标的内容，员工（财务专员）审批时，“住宿费-租房”或者“住宿费-宾馆”费用超标不驳回差旅申请。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为已驳回"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "释放被冻结的预算额度"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务驳回日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Return_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "如果BTA申请单存在非原则性错误（如信息填写不完整、备注不清晰），财务专员可以选择“退回”操作，而不是直接驳回。退回后，单据状态变为（待修改），退回到申请人手中。申请人修改补充信息后，可以再次提交，流程通常会跳过业务审批直接回到财务节点（视具体流程配置而定），避免重复审批。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_RETURN_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "退回修改意见",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_RETURN_BTA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为待修改"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务退回日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Suspend_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "在财务审核过程中，如果遇到需要进一步核实的情况（如需要确认项目预算详情、等待线下单据送达），财务专员可以将BTA申请单挂起。挂起后，单据状态变为（已挂起），流程暂停倒计时（如有SLA）。待问题解决后，财务专员可以解挂继续审核。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_SUSPEND_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "挂起原因",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_SUSPEND_BTA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为已挂起"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务挂起日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Cashier_Review_Bta",
+      "category": "BTA_Management",
+      "auto_or_manual": "manual",
+      "description": "出纳人员处理状态为（待支付）的BTA申请单（对应借款记录）。出纳确认银行账户信息无误后，执行支付操作。系统会与网银或资金系统对接完成打款。支付成功后，单据状态更新为（已借款/已完成），并通知员工查收。",
+      "target_objects": [
+        "Business_Travel_Application"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "CASHIER_REVIEW_BTA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Business_Travel_Application",
+          "type": "Object",
+          "required": true,
+          "description": "BTA申请单",
+          "source_object": "Business_Travel_Application"
+        }
+      ],
+      "triggered_event": [
+        "CASHIER_REVIEW_BTA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Business_Travel_Application",
+            "action": "MODIFY",
+            "details": "更新BTA申请单状态为已借款"
+          },
+          {
+            "object_type": "Travel_Loan",
+            "action": "MODIFY",
+            "details": "更新借款记录支付状态为已支付"
+          }
+        ],
+        "notifications": [
+          {
+            "type": "MODIFY",
+            "rule_id": "Expense_Ontology_Rule_082",
+            "details": "当员工(出纳)执行此动作以完成支付时，从发薪系统获取员工收款账户。优先取报销账户，如果没有就取薪资账户。"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Upload_Invoice",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工在填写ECA报销单时，需要上传发票作为费用凭证。系统支持上传电子发票（PDF/OFD）或拍照上传纸质发票图片。系统会自动调用OCR服务识别发票内容（金额、税额、代码、号码等），并进行发票真伪查验（验真）。识别和验真通过的发票会被保存为发票对象，并与报销单关联。",
+      "target_objects": [
+        "Invoice"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "UPLOAD_INVOICE_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "file_data",
+          "type": "String",
+          "required": true,
+          "description": "文件流",
+          "source_object": "Invoice"
+        },
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "关联的ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "UPLOAD_INVOICE_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity Check (数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_222",
+              "enforcement_level": "SHOULD",
+              "rule_content": "员工（提单人）上传报销凭证（发票）至票夹系统后，票夹系统自动调用税务接口验证真伪并识别信息。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_223",
+              "enforcement_level": "SHOULD",
+              "rule_content": "员工（提单人）上传报销凭证（发票）至票夹系统后，票夹系统自动调用OCR接口识别日期、金额、发票号"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_233",
+              "enforcement_level": "SHOULD",
+              "rule_content": "员工（提单人）在票夹系统上传报销凭证（发票）时，票夹系统自动校验合规性，若结果为不合规禁止上传，并提示发票不合规原因。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Invoice",
+            "action": "CREATE",
+            "details": "创建发票对象记录"
+          },
+          {
+            "object_type": "Invoice",
+            "action": "MODIFY",
+            "details": "回填OCR识别结果"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Upload_Attachment",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "除了发票外，员工还需要上传其他证明材料，如行程单、水单、审批邮件截图等。这些文件作为附件对象保存，并与ECA报销单或BTA申请单关联，供审批人查阅。",
+      "target_objects": [
+        "Document_Attachment"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "UPLOAD_ATTACHMENT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "file_data",
+          "type": "String",
+          "required": true,
+          "description": "文件流",
+          "source_object": "Document_Attachment"
+        },
+        {
+          "name": "file_name",
+          "type": "String",
+          "required": true,
+          "description": "文件名",
+          "source_object": "Document_Attachment"
+        }
+      ],
+      "triggered_event": [
+        "UPLOAD_ATTACHMENT_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Business Logic Validation",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_164",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房备案触发动作上传合同时逻辑执行1.人工/OCR校验：签署方是否为“公司”。执行动作若为公章签署：阻断（应以个人名义签署），提示“禁止使用公司名义签订长租合同”。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Document_Attachment",
+            "action": "CREATE",
+            "details": "创建附件对象记录"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Link_Attachment",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "将已上传的附件或发票与具体的单据（BTA或ECA）进行关联。一个附件可以关联到一个主单据，也可以关联到单据下的具体明细项（如某条住宿费明细）。",
+      "target_objects": [
+        "Document_Attachment"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LINK_ATTACHMENT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Document_Attachment",
+          "type": "Object",
+          "required": true,
+          "description": "附件",
+          "source_object": "Document_Attachment"
+        },
+        {
+          "name": "target_object_id",
+          "type": "String",
+          "required": true,
+          "description": "关联目标ID（如报销单ID）",
+          "source_object": "Document_Attachment"
+        }
+      ],
+      "triggered_event": [
+        "LINK_ATTACHMENT_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Document_Attachment",
+            "action": "MODIFY",
+            "details": "建立附件与单据的关联关系"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Link_Invoices_To_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工在填写ECA报销单时，需要将已上传并验真的发票与报销单关联。关联操作可以是批量选择多张发票。关联后，系统会自动汇总发票金额到报销单的总金额中，并根据发票类型（如餐饮、住宿）自动生成或关联相应的费用明细项。",
+      "target_objects": [
+        "Expense_Claim",
+        "Invoice"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LINK_INVOICES_TO_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "invoice_ids",
+          "type": "String",
+          "required": true,
+          "description": "发票ID列表",
+          "source_object": "Invoice"
+        }
+      ],
+      "triggered_event": [
+        "LINK_INVOICES_TO_ECA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "建立发票与报销单的关联"
+          },
+          {
+            "object_type": "Invoice",
+            "action": "MODIFY",
+            "details": "更新发票状态为已关联"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新报销单总金额"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Save_Eca_Draft",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工在填写ECA报销单过程中，可以随时保存草稿。保存操作会存储当前已填写的信息（包括基本信息、费用明细、关联发票等），但不进行严格的业务规则校验（如预算超标校验）。状态为草稿的报销单可以被多次编辑。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SAVE_ECA_DRAFT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "SAVE_ECA_DRAFT_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity & Invoice Compliance Check (发票与数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_001",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）在提交ECA报销单时，系统将校验关联的发票。若凭证包含以下任一特征，系统阻断提交并提示“不符合财务要求”：1.印章不合规：无税务/财政监制章，或无发票专用章（国定票据除外）；2.费用类型违规：加油票；3.抬头违规：个人抬头的发票(增值税电子普通发票)。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_002",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工收到或提交发票时，系统执行员工承诺校验或印章合规性预检：1.校验发票的印章状态，若识别为“非发票专用章”则阻断提交。2.若凭证识别为“代开”，校验是否包含双章（代开单位+收款单位）。（注：若无OCR数据，此规则通过强制勾选“已核对印章”承诺项实现）"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_003",
+              "enforcement_level": "SHOULD",
+              "rule_content": "针对内容笼统（如仅注明“办公用品”或“详见销货清单”）的发票，系统执行强制拦截：当员工在提交ECA报销单时，若关联的发票属于“办公用品”类，系统将检查该发票是否勾选了“已上传销货清单”选项。若未勾选，提交按钮将被阻断，并提示员工：“此发票内容笼统，请补充上传《销货清单》附件并勾选确认”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_005",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销时，系统执行“买方一致性”强校验，并要求员工确认“卖方一致性”：1.买方自动校验：校验发票的抬头名称必须包含本公司法定名称（或同名），否则阻断。2.卖方与付款一致性：若收款人与发票销方不一致，系统检查是否已上传“委托付款协议”附件（或要求员工强制勾选“已上传委托协议”承诺项）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_011",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销快递费时，必须提供快递发票，类型仅限增值税专用发票、增值税普通发票或定额发票。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_012",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销境外签证费时，可提供国内发票或邮件确认单；若为代办机构服务费，必须附上护照签证页。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_013",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国际机票时，必须提供Invoice/Receipt或平台代订发票，并附带机票电子行程单；若为外币支付，需提供换汇水单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_014",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外出租车、公交或地铁费用时，必须提供Invoice、Receipt等形式的合规发票（即票据）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_015",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外酒店费用时，必须提供Invoice/Receipt形式的发票以及详细的住宿水单（HotelDescription）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_017",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外城市间的火车、轮船或长途大巴费用时，必须提供Invoice、Receipt等形式的发票（即票据）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_018",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外租房费用时，必须提供“Rental”相关的Invoice或Receipt形式的租赁凭证。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_019",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外业务快递费时，必须提供快递发票，形式可为专票、普票或定额发票。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_023",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须自动比对每一条ECA费用明细项中选择的“费用类型”与该行挂载的发票通过OCR识别出的“商品或服务名称”是否匹配。如果发现两者类型不匹配，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_029",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，应检查每张发票上的小写阿拉伯数字金额与大写汉字金额。若识别出两者数值不一致，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_035",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交报销单且ECA费用明细项费用类型为“签证费”时，系统应识别发票上的商品服务名称。若发票内容识别结果不包含“签证”字样（如仅显示“服务费”或“代办费”），系统必须检查该明细项下是否上传了额外的附件。若缺失佐证附件，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_058",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在提交ECA报销单时，ECA费用明细项包含费用类型为保险费，并且报销金额大于0的费用明细项，必须自动校验关联的发票（电子客票行程单或机票电子发票）。如果凭证上未识别到保险费信息，或者凭证上的保险费金额为0，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_206",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交ECA报销单时，必须提供报销凭证或者补助金额，否则禁止ECA报销单提交并提示报销凭证为空或者补助金额为0。"
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Travel & Expense Policy Compliance Check (差旅与报销政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_004",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工在提交ECA报销单时，系统检查所有关联的增值税专用发票。若开票日期距离当前提交日期超过360天，系统阻断提交并提示：“发票已超过报销时效（360天），请联系财务核实”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_006",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销智行火车/高铁/动车费时，必须提供实体车票或电子车票：1.当发票类型为“火车/高铁票”时，若票面（通过OCR或备注）不包含“仅供报销使用”字样，系统阻断提交。2.SOP提示：在提交界面提示员工：“请确保已归集实体车票原件”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_007",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销机票退改签费用时，系统执行违规关键字阻断及附件完整性检查：1.当报销“机票退改签费用”时，若发票内容或备注包含“旅游”、“团费”等字样，系统直接阻断。2.系统检查当前单据的附件数量是否>1（要求同时包含：发票+退改签行程单/截图）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_008",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销长期出差租房费时，必须提供租房合同，系统强制校验是否已上传“租房合同”作为附件（检查附件标记或用户勾选确认），包括中介费需附中介发票，房租需附出租人发票（含归属期），物业水电费需提供发票及明细。若无合同关联，不可提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_009",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销人身意外险时，系统执行保险合规校验：1.关键字拦截：若保险发票内容包含“旅游”、“旅行综合险”等字样，系统阻断。2.附件完整性：系统检查是否包含“保单/保险单”附件"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_025",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统应逐一检查每张发票的“发生日期”。系统需验证该日期是否处于ECA报销单记录的“出差开始日期”与“出差结束日期”之间。如果开票日期早于出差开始时间（不含预订类票据），或晚于系统允许的报销时效，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_062",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单且ECA费用明细项为“住宿费-租房”时，如果关联发票抬头显示为个人（非公司名称），系统必须强制检查该明细项下是否上传了指定的两类附件：租房合同。如果缺少其中任何一项附件，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_064",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单且费用明细项费用类型为“住宿费-租房”，如果发票抬头为“个人”时（非公司名称），系统需检测该明细项或BTA下是否上传了附件。无论主发票是否为“半张发票”（即裁剪后的分摊凭证或部分金额凭证），系统必须强制检查是否包含租房合同。若未包含，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_067",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单时，如果费用明细项为“市内交通费-出租车/公交车等”时，系统必须强制检查该明细项下是否上传了除发票外的额外附件。系统可通过关键字检索（如附件文件名包含“行程”、“单”等）或OCR内容识别确认附件是否具备“行程单”特征。若未检测到对应的行程单附件，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_118",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景员工非客户付费场景因公出差产生费用需要报销时，触发动作当员工提交ECA报销单时，逻辑校验系统中是否关联了一条状态为审批通过且未被其他ECA关联的BTA出差申请单。执行如果没有，执行动作：阻断提交，并返回错误提示“员工因公出差，必须提前在支付报销系统填写出差申请”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_123_future",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景因公出差ECA报销单提交触发动作当员工提交ECA报销单时，逻辑执行读取关联的BTA出差申请单，进行行程一致性比对：1.变更校验：检查“实际开始时间”是否早于“计划开始时间”（提前出发）；2.逾期校验：检查“实际结束时间”是否晚于“计划结束时间”。执行动作变更拦截：若触发提前出发或地点变更，阻断(Block)提交，并返回错误提示：“行程变更或提前出发，原申请单失效，需重新发起BTA申请。”；逾期放行：若仅触发逾期晚归，允许(Allow)提交，系统将自动标记逾期状态，并按ECA填写的实际结束时间提交主管审批。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_133",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA报销单明细填报（费用类型=退改签手续费）触发动作当员工添加/编辑一笔“退改签费用”明细时，逻辑执行1.原因归因校验：读取该笔费用选择的“退改原因”字段；2.支付属性判定：若原因字段选择为“个人原因”，判定该笔费用的“公司承担金额”应为0。执行动作阻断提交：禁止提交，同时弹出提示：“根据政策，个人原因产生的退改签费用不可报销。”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_142",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA住宿报销触发动作提交明细时逻辑执行1.校验订单来源是否为“企业差旅平台”；2.若非平台订单，强制校验附件中是否包含“支付凭证/水单”及“同批次酒店说明”。执行动作平台订单：自动放行；线下订单无凭证：阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_143",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景提交ECA住宿报销触发动作提交ECA住宿报销时逻辑执行1.检查住宿费用明细类型，仅允许“房费”。执行动作若包含“餐饮”、“洗衣”等非房费明细，阻断提交，提示“请将非房费项目拆分至个人费用”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_163",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房申请触发动作发起ECA报销单包含租房时逻辑执行1.检查是否包含业务部门邮件审批附件（业务部门专项审批邮件）。执行动作无审批记录：阻断后续报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_169",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景海外差旅ECA触发动作提交ECA报销申请单，因公海外录入租车费时逻辑执行1.强制检查：是否关联“CXO审批的预算单”。执行动作无CXO审批：阻断报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_172",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景差旅变更触发动作提交ECA报销申请单逻辑执行1.行程校验：校验ECA实际行程与对应BTA行程是否一致。2.若不一致，检查是否有直属主管批准。执行动作行程不一致且无批准：阻断绕道申请。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_183",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA无票报销触发动作提交ECA报销单时，“票据丢失”且金额>200时逻辑执行1.检查凭证：是否有“上一级审批”和“支付凭证”。执行动作若齐全：赔付金额=票面金额*70%；否则：阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_184",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景适用性判断触发动作提交ECA报销单时，申请人主体=境外子公司逻辑执行1.行程目的地=中国国内；2.检查当地法律是否有冲突。执行动作若当地法律无冲突：默认执行“国内差旅规定”；若有冲突：阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_188",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景ECA提交触发动作提交ECA报销单时，费用日期跨年时逻辑执行1.检查当前日期是否晚于“财务关账日”。执行动作若晚于：允许提交，提示“跨年发票已停止报销，请联系财务”。财务部门人工审核。"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "Financial Control & Risk Management (财务风控与合规校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_033",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统应检查ECA费用明细项中的费用类型为在途交通费-机票，如果该明细项与公司统一结算的商旅订单行程信息(航班号、日期、乘机人)重合，系统应阻断提交并提示“公司统付机票不可再次报销”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_039",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，应提取每张发票上的销方名称与服务名称。系统需通过外部数据接口校验销方的销售方经营范围是否覆盖了发票上的服务名称。如果系统判定发票内容明显超出销方注册的经营范围（例如餐饮公司开具了IT服务费），应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_041",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，必须提取每张发票的销方税号或名称，并通过外部工商/税务数据接口查询该企业的销售方基本信息的“成立日期”。若发现开票方成立时间不足半年且发票金额大于发票开票金额高风险阈值信息，系统应识别其存在“暴力虚开”风险，应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_045",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票上的销方税号或名称，并通过外部数据接口查询该企业的销售方基本信息的工商与税务状态。如果查询结果显示开票方当前处于“注销”系统仅提示“请补充材料”。如果开票方处于“撤销”、“吊销”或“经营异常（失联）”状态，系统应判定该发票来源不合规，阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_047",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须自动提取每张发票的“发生日期”与销方税号或名称，并调用外部数据接口查询销方当前的销售方基本信息的经营状态及状态变更日期。如果查询结果显示销方经营状态处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，且发票的开票日期晚于上述状态的变更日期，系统应认定该发票为无效票据，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_052",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取发票的销方信息，并调用外部工商/税务数据接口查询该企业的销售方基本信息的核心人员结构。如果该企业的“企业法人”、“财务负责人”和“办税人员”为同一自然人，系统应识别其具备“一人公司”或“风险空壳”特征，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_054",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票的销方信息，并调用外部接口查询销售方基本信息。如果发现该销方处于一个“多户企业同法人且同手机号”的异常关联网络中，系统应识别其具有团伙虚开的高危特征，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_056",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票的销方信息，并调用外部风控数据接口获取外部风控数据。如果检测到销方存在此类风险数据，且发票的开具日期处于该风险记录生成前的3个月内，系统应识别其存在未申报纳税的风险，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_113",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需针对每一个费用明细项执行比对校验。若出现报销金额>发票总金额的情况，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_158",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景当员工提交ECA报销单时，长差租房触发动作提交ECA时，计算长差租房补助逻辑执行1.校验日综合限额：每日补助<=110元。执行动作若超限，提示调整或阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_159",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差ECA触发动作提交租房报销时逻辑执行1.熔断上限：检查单套月租是否>4800元。执行动作若月租<=4800或月租>4800且有审批：允许提交，否则阻断提交，提示“单套月租金超过集团红线，需审批后支付”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_160",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房中介费触发动作提交ECA报销单录入中介费时逻辑执行1.限额校验：中介费金额<=1个月房租；执行动作超限且无审批：阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_165",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作提交ECA报销单录入费用时逻辑执行1.费用类型检查：是否为“押金/Deposit”。执行动作若是：阻断提交，提示“押金需员工自行垫付，退租时收回，不可报销”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_171",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA合规检查触发动作提交ECA报销申请单，上传发票时逻辑执行若该发票关联了其他ECA报销单执行动作阻断提交，提示“该发票关联了其他ECA报销单，无法重复报销，请检查。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "CREATE",
+            "details": "创建/更新ECA报销单草稿"
+          },
+          {
+            "type": "MODIFY",
+            "rule_id": "Expense_Ontology_Rule_513",
+            "details": "场景：当系统保存ECA报销单时，如果费用明细中所有发票均为电子发票，系统应标记为\"纯电票\"流程。逻辑：设置electronicInvoiceFlg='0'"
+          },
+          {
+            "type": "MODIFY",
+            "rule_id": "Expense_Ontology_Rule_144",
+            "details": "适用场景提交ECA住宿报销触发动作金额录入时逻辑执行1.比对“实际金额”与“标准限额”；2.若超标，检查是否关联“超标特批单（一级主官批准）”。执行动作无特批且超标：系统自动计算超标部分，只报销标准内金额；有特批：报销全部金额。"
+          },
+          {
+            "type": "INTEGRATION",
+            "rule_id": "Expense_Ontology_Rule_145",
+            "details": "适用场景提交ECA住宿报销（多人同住）触发动作填写短差补助金额并提交时，逻辑执行系统自动计算：1.读取同住人列表，获取最高职级标准；2.计算新标准=最高标准*1.2；3.检查票据附件是否包含所有同住人签名（人工确认）。执行动作超标判定基于新标准执行；缺少签名：人工驳回。"
+          },
+          {
+            "type": "INTEGRATION",
+            "rule_id": "Expense_Ontology_Rule_203_B",
+            "details": "当员工创建ECA报销单并关联BTA时。系统自动从BTA申请单继承关键信息（项目编码、出差事由、出发地、开始日期等）。强锁定：继承的信息在前端必须设置为**“只读/锁定”**状态，禁止员工修改，确保报销口径与申请一致。例外豁免：**“结束日期”**字段允许开放编辑，以支持实际行程变更（如提前或延后返回），但需触发后续的Rule_025进行日期合理性校验。"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Submit_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "员工完成ECA报销单的所有信息填写和附件上传后，正式提交申请。系统会执行全面的规则校验：包括必填项检查、发票完整性校验、预算余额校验、差旅标准校验（如住宿费是否超标）、重复报销校验等。校验通过后，报销单状态变更为（待审批）或（待财务审核），并进入审批流。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SUBMIT_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "SUBMIT_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity & Invoice Compliance Check (发票与数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_001",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）在提交ECA报销单时，系统将校验关联的发票。若凭证包含以下任一特征，系统阻断提交并提示“不符合财务要求”：1.印章不合规：无税务/财政监制章，或无发票专用章（国定票据除外）；2.费用类型违规：加油票；3.抬头违规：个人抬头的发票(增值税电子普通发票)。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_002",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工收到或提交发票时，系统执行员工承诺校验或印章合规性预检：1.校验发票的印章状态，若识别为“非发票专用章”则阻断提交。2.若凭证识别为“代开”，校验是否包含双章（代开单位+收款单位）。（注：若无OCR数据，此规则通过强制勾选“已核对印章”承诺项实现）"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_003",
+              "enforcement_level": "SHOULD",
+              "rule_content": "针对内容笼统（如仅注明“办公用品”或“详见销货清单”）的发票，系统执行强制拦截：当员工在提交ECA报销单时，若关联的发票属于“办公用品”类，系统将检查该发票是否勾选了“已上传销货清单”选项。若未勾选，提交按钮将被阻断，并提示员工：“此发票内容笼统，请补充上传《销货清单》附件并勾选确认”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_005",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销时，系统执行“买方一致性”强校验，并要求员工确认“卖方一致性”：1.买方自动校验：校验发票的抬头名称必须包含本公司法定名称（或同名），否则阻断。2.卖方与付款一致性：若收款人与发票销方不一致，系统检查是否已上传“委托付款协议”附件（或要求员工强制勾选“已上传委托协议”承诺项）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_011",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销快递费时，必须提供快递发票，类型仅限增值税专用发票、增值税普通发票或定额发票。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_012",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销境外签证费时，可提供国内发票或邮件确认单；若为代办机构服务费，必须附上护照签证页。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_013",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国际机票时，必须提供Invoice/Receipt或平台代订发票，并附带机票电子行程单；若为外币支付，需提供换汇水单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_014",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外出租车、公交或地铁费用时，必须提供Invoice、Receipt等形式的合规发票（即票据）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_015",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外酒店费用时，必须提供Invoice/Receipt形式的发票以及详细的住宿水单（HotelDescription）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_017",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外城市间的火车、轮船或长途大巴费用时，必须提供Invoice、Receipt等形式的发票（即票据）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_018",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外租房费用时，必须提供“Rental”相关的Invoice或Receipt形式的租赁凭证。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_019",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销国外业务快递费时，必须提供快递发票，形式可为专票、普票或定额发票。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_023",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须自动比对每一条ECA费用明细项中选择的“费用类型”与该行挂载的发票通过OCR识别出的“商品或服务名称”是否匹配。如果发现两者类型不匹配，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_029",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，应检查每张发票上的小写阿拉伯数字金额与大写汉字金额。若识别出两者数值不一致，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_035",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交报销单且ECA费用明细项费用类型为“签证费”时，系统应识别发票上的商品服务名称。若发票内容识别结果不包含“签证”字样（如仅显示“服务费”或“代办费”），系统必须检查该明细项下是否上传了额外的附件。若缺失佐证附件，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_058",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)在提交ECA报销单时，ECA费用明细项包含费用类型为保险费，并且报销金额大于0的费用明细项，必须自动校验关联的发票（电子客票行程单或机票电子发票）。如果凭证上未识别到保险费信息，或者凭证上的保险费金额为0，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_206",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工（提单人）提交ECA报销单时，必须提供报销凭证或者补助金额，否则禁止ECA报销单提交并提示报销凭证为空或者补助金额为0。"
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Travel & Expense Policy Compliance Check (差旅与报销政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_004",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工在提交ECA报销单时，系统检查所有关联的增值税专用发票。若开票日期距离当前提交日期超过360天，系统阻断提交并提示：“发票已超过报销时效（360天），请联系财务核实”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_006",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销智行火车/高铁/动车费时，必须提供实体车票或电子车票：1.当发票类型为“火车/高铁票”时，若票面（通过OCR或备注）不包含“仅供报销使用”字样，系统阻断提交。2.SOP提示：在提交界面提示员工：“请确保已归集实体车票原件”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_007",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销机票退改签费用时，系统执行违规关键字阻断及附件完整性检查：1.当报销“机票退改签费用”时，若发票内容或备注包含“旅游”、“团费”等字样，系统直接阻断。2.系统检查当前单据的附件数量是否>1（要求同时包含：发票+退改签行程单/截图）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_008",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销长期出差租房费时，必须提供租房合同，系统强制校验是否已上传“租房合同”作为附件（检查附件标记或用户勾选确认），包括中介费需附中介发票，房租需附出租人发票（含归属期），物业水电费需提供发票及明细。若无合同关联，不可提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_009",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销人身意外险时，系统执行保险合规校验：1.关键字拦截：若保险发票内容包含“旅游”、“旅行综合险”等字样，系统阻断。2.附件完整性：系统检查是否包含“保单/保险单”附件"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_010",
+              "enforcement_level": "SHOULD",
+              "rule_content": "在员工选择“大巴/轮船费”时，UI界面显示提示文案：“请务必提供机打或定额车船票，手写收据无效。”（此规则不涉及后台逻辑代码，仅为前端提示）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_016",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工报销保险费时，原则上需提供国内发票；若提供国外保险单据，需确认符合特批政策并附上保单复印件。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_025",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统应逐一检查每张发票的“发生日期”。系统需验证该日期是否处于ECA报销单记录的“出差开始日期”与“出差结束日期”之间。如果开票日期早于出差开始时间（不含预订类票据），或晚于系统允许的报销时效，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_027",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，如果费用明细项关联的凭证为传统纸质发票或非免章电子发票的凭证，如果票面没有红色的“发票专用章”印记,未检测到印章特征，应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_031",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，ECA费用明细项的费用类型为“市内交通费-出租车/公交车等”或者“在途交通费-火车/轮船/大巴等”，如果关联的发票的票面没有“日期”、“发票代码/号码”及“金额”等关键信息，系统应该阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_033",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统应检查ECA费用明细项中的费用类型为在途交通费-机票，如果该明细项与公司统一结算的商旅订单行程信息(航班号、日期、乘机人)重合，系统应阻断提交并提示“公司统付机票不可再次报销”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_062",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单且ECA费用明细项为“住宿费-租房”时，如果关联发票抬头显示为个人（非公司名称），系统必须强制检查该明细项下是否上传了指定的两类附件：租房合同。如果缺少其中任何一项附件，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_064",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单且费用明细项费用类型为“住宿费-租房”，如果发票抬头为“个人”时（非公司名称），系统需检测该明细项或BTA下是否上传了附件。无论主发票是否为“半张发票”（即裁剪后的分摊凭证或部分金额凭证），系统必须强制检查是否包含租房合同。若未包含，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_067",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单时，如果费用明细项为“市内交通费-出租车/公交车等”时，系统必须强制检查该明细项下是否上传了除发票外的额外附件。系统可通过关键字检索（如附件文件名包含“行程”、“单”等）或OCR内容识别确认附件是否具备“行程单”特征。若未检测到对应的行程单附件，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_069",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，费用明细项的费用类型为“在途交通费”时，如果费用类型不属于以下白名单列表：1.航空运输电子客票行程单或电子发票；2.铁路车票（火车票）；3.公路/水路客票（汽车票、轮船票）；4.出租车票、网约车电子发票；5.过路过桥费发票；6.公交/地铁定额发票；7.退改签手续费发票（如携程等平台）。若识别结果为其他类型（如餐饮发票、超市购物小票、通用收据等），系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_071",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，对于费用类型为住宿费-宾馆或者住宿费-租房的费用明细项，如果发票的货物或服务名称及发票类型的对比不符合以下特征之一：\n1.住宿费-宾馆：发票的服务名称包含“住宿费”、“房费”、“酒店服务”等；\n2.住宿费-租房：服务名称包含“房屋租赁”、“租金”，且销方为企业（出租人开具）或者发票类型为税务局代开的通用机打发票（通常用于个人房东），备注栏或货物栏注明“房屋租赁”。\n系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_073",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(提单人)提交ECA报销单时，费用明细项的费用类型为中介费、保险费、快递费、签证费，如果发票的货物或服务名称，并与选定的费用类型不匹配，比如：\n1.中介费：发票内容不包含“中介服务”、“经纪代理”等字样；\n2.保险费：发票内容不包含“保险费”；\n3.快递费：发票内容不包含“物流”、“运输”、“快递服务”；\n4.签证费：发票内容不包含“签证费”、“领事服务”或“代办签证”。\n应阻断提交并提示员工上传对应类别的合规发票。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_118",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景员工非客户付费场景因公出差产生费用需要报销时，触发动作当员工提交ECA报销单时，逻辑校验系统中是否关联了一条状态为审批通过且未被其他ECA关联的BTA出差申请单。执行如果没有，执行动作：阻断提交，并返回错误提示“员工因公出差，必须提前在支付报销系统填写出差申请”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_123_future",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景因公出差ECA报销单提交触发动作当员工提交ECA报销单时，逻辑执行读取关联的BTA出差申请单，进行行程一致性比对：1.变更校验：检查“实际开始时间”是否早于“计划开始时间”（提前出发）；2.逾期校验：检查“实际结束时间”是否晚于“计划结束时间”。执行动作变更拦截：若触发提前出发或地点变更，阻断(Block)提交，并返回错误提示：“行程变更或提前出发，原申请单失效，需重新发起BTA申请。”；逾期放行：若仅触发逾期晚归，允许(Allow)提交，系统将自动标记逾期状态，并按ECA填写的实际结束时间提交主管审批。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_132",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA报销申请单提交（填写预计市内交通费）触发动作当员工在ECA报销申请单中填写“预计市内交通费”时，逻辑执行1.关键政策强提示（系统）：前端在金额栏显眼位置提示：“政策红线：单笔出租车费>100元将触发严格审计，非必要请选择公共交通（巴士/地铁）”；2.预算构成核验（审批人）：审批人需评估申请的总金额是否包含潜在的违规大额打车，并对合理性负责。执行动作放行提交：系统不进行阻断，允许提交；最终裁决业务审批人审批结果：若业务审批人批准，系统视为该预算额度已获授权；若审批人认为预算暗示了过度打车，可要求调减预算。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_133",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA报销单明细填报（费用类型=退改签手续费）触发动作当员工添加/编辑一笔“退改签费用”明细时，逻辑执行1.原因归因校验：读取该笔费用选择的“退改原因”字段；2.支付属性判定：若原因字段选择为“个人原因”，判定该笔费用的“公司承担金额”应为0。执行动作阻断提交：禁止提交，同时弹出提示：“根据政策，个人原因产生的退改签费用不可报销。”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_134",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA报销申请单提交触发动作当员工填写ECA报销申请单进行交通费报销时逻辑执行1.违规风险红线提示（系统）：前端弹出阻断级或警告级提示：“政策红线：公司严禁‘异地出差’自驾，违规自驾费用将不予报销”；2.场景界定人工核验（审批人）：审批人需结合出差目的地，判定是否是自驾车。执行动作判定非自驾车：审批人批准；判定是自驾车：审批人拒绝该单据，并提示“公司严禁‘异地出差’自驾”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_136",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景国内及海外出差全流程报销商旅保险触发动作1.ECA报销单提交商旅保险报销时，逻辑执行查询公司是否已经为该次出差行程购买了商旅保险执行动作未购买：允许提交；已购买：阻断提交，并提示“按公司政策，公司已统一购买商旅保险”"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_141",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景BTA/ECA提交触发动作填写目的地时逻辑执行1.比对“目的地城市”与申请人“常驻地”或“招聘地”。执行动作若一致：阻断差旅申请，提示“同城公干不属于差旅，请走市内交通/误餐报销流程”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_142",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA住宿报销触发动作提交明细时逻辑执行1.校验订单来源是否为“企业差旅平台”；2.若非平台订单，强制校验附件中是否包含“支付凭证/水单”及“同批次酒店说明”。执行动作平台订单：自动放行；线下订单无凭证：阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_143",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景提交ECA住宿报销触发动作提交ECA住宿报销时逻辑执行1.检查住宿费用明细类型，仅允许“房费”。执行动作若包含“餐饮”、“洗衣”等非房费明细，阻断提交，提示“请将非房费项目拆分至个人费用”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_149",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA补助计算触发动作提交ECA报销单时逻辑执行1.读取申请人岗位属性；2.若岗位包含“销售/Sales”。执行动作强制设置补助标准=0元，且不可修改。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_152",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA交通补助触发动作提交ECA报销单时逻辑执行1.判定时间：运行区间是否覆盖20:00-07:00；2.判定时长：是否>=8小时；3.判定席别：是否为“硬座”。执行动作满足所有条件：财务审批时，提示添加一笔补贴明细，金额=票价*50%。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_153",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景当员工提交ECA报销单时，总公司标准查询触发动作选择城市时逻辑执行1.匹配城市列表：北京、上海、深圳、广州。执行动作若匹配：标记为“特定地区”；否则：标记为“其他地区”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_155",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景补助标准计算触发动作读取员工职级时逻辑执行1.若职级为A/B级，标准=0元；2.若职级为C/D级，标准=50元。执行动作返回每日补助单价。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_156",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景当员工提交ECA报销单时，差旅等级判定触发动作读取员工信息时逻辑执行依据Title/Grade字段映射：根据映射表，如（总裁/CXO->A级；LOB/LOF一级->B级；发文干部->C级；其他->D级）执行动作确定员工的差旅等级。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_157",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景当员工提交ECA报销单时，长期出差ECA触发动作提交租房报销时逻辑执行1.费用标准计算：40*人数*天数；2.自动拆分：若实际房租高于标准，高出部分需特殊审批或个人承担。执行动作若高于保准且又特批：按实际发生金额报销；否则：按标准报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_161",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作提交ECA报销单明细时逻辑执行1.关键词扫描：家具、家电。执行动作若包含：阻断该行明细提交，提示“固定资产/耐用品采购不属于差旅报销范围，请走采购流程”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_163",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房申请触发动作发起ECA报销单包含租房时逻辑执行1.检查是否包含业务部门邮件审批附件（业务部门专项审批邮件）。执行动作无审批记录：阻断后续报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_165",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作提交ECA报销单录入费用时逻辑执行1.费用类型检查：是否为“押金/Deposit”。执行动作若是：阻断提交，提示“押金需员工自行垫付，退租时收回，不可报销”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_168",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景报销费用类型验证触发动作提交ECA报销申请单，选择费用类型时逻辑执行1.验证费用类型是否在白名单内：机场建设费、因公机票邮寄费、轮船费、海外签证费。执行动作若在名单内：标记为实报实销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_169",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景海外差旅ECA触发动作提交ECA报销申请单，因公海外录入租车费时逻辑执行1.强制检查：是否关联“CXO审批的预算单”。执行动作无CXO审批：阻断报销。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_170",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA报销触发动作提交ECA报销申请单，录入明细时逻辑执行1.黑名单匹配：若费用类型属于小费或洗衣费。执行动作阻断提交，提示“属个人费用，公司不予报销”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_171",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA合规检查触发动作提交ECA报销申请单，上传发票时逻辑执行若该发票关联了其他ECA报销单执行动作阻断提交，提示“该发票关联了其他ECA报销单，无法重复报销，请检查。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_172",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景差旅变更触发动作提交ECA报销申请单逻辑执行1.行程校验：校验ECA实际行程与对应BTA行程是否一致。2.若不一致，检查是否有直属主管批准。执行动作行程不一致且无批准：阻断绕道申请。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_182",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA无票报销触发动作提交ECA报销单时，“票据丢失”时逻辑执行1.判断金额<=200元。执行动作若是：阻断报销（不予赔付）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_183",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA无票报销触发动作提交ECA报销单时，“票据丢失”且金额>200时逻辑执行1.检查凭证：是否有“上一级审批”和“支付凭证”。执行动作若齐全：赔付金额=票面金额*70%；否则：阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_184",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景适用性判断触发动作提交ECA报销单时，申请人主体=境外子公司逻辑执行1.行程目的地=中国国内；2.检查当地法律是否有冲突。执行动作若当地法律无冲突：默认执行“国内差旅规定”；若有冲突：阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_185",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景ECA外币报销触发动作提交ECA报销单时，填写汇率时逻辑执行1.优先：附件包含“换汇水单”，使用水单汇率；2.兜底：使用财务月度公布汇率。执行动作系统根据输入计算本币金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_188",
+              "enforcement_level": "SHOULD",
+              "rule_content": "适用场景ECA提交触发动作提交ECA报销单时，费用日期跨年时逻辑执行1.检查当前日期是否晚于“财务关账日”。执行动作若晚于：允许提交，提示“跨年发票已停止报销，请联系财务”。财务部门人工审核。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_205",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交ECA报销单时，如果关联的BTA申请单的“酒店预订”或者“机票预订”为公司结算，费控系统自动查询并填充携程商旅的机票、酒店订单明细及费用信息。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_209",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交ECA报销单时，费控系统依据报销单出差目的地、酒店地址、打车目的地信息，自动判断报销凭证是否符合差旅标准，自动标记异常报销凭证"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "Financial Control & Risk Management (财务风控与合规校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_037",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，需计算票面金额占核定额度的比例。如果计算结果显示该比例高于90%，应判定该发票存在虚开风险，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_039",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，应提取每张发票上的销方名称与服务名称。系统需通过外部数据接口校验销方的销售方经营范围是否覆盖了发票上的服务名称。如果系统判定发票内容明显超出销方注册的经营范围（例如餐饮公司开具了IT服务费），应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_041",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，必须提取每张发票的销方税号或名称，并通过外部工商/税务数据接口查询该企业的销售方基本信息的“成立日期”。若发现开票方成立时间不足半年且发票金额大于发票开票金额高风险阈值信息，系统应识别其存在“暴力虚开”风险，应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_045",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票上的销方税号或名称，并通过外部数据接口查询该企业的销售方基本信息的工商与税务状态。如果查询结果显示开票方当前处于“注销”系统仅提示“请补充材料”。如果开票方处于“撤销”、“吊销”或“经营异常（失联）”状态，系统应判定该发票来源不合规，阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_047",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须自动提取每张发票的“发生日期”与销方税号或名称，并调用外部数据接口查询销方当前的销售方基本信息的经营状态及状态变更日期。如果查询结果显示销方经营状态处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，且发票的开票日期晚于上述状态的变更日期，系统应认定该发票为无效票据，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_051",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，如果“开票人”、“收款人”和“复核人”显示相同，系统应认定该发票缺乏内控有效性，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_052",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取发票的销方信息，并调用外部工商/税务数据接口查询该企业的销售方基本信息的核心人员结构。如果该企业的“企业法人”、“财务负责人”和“办税人员”为同一自然人，系统应识别其具备“一人公司”或“风险空壳”特征，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_054",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票的销方信息，并调用外部接口查询销售方基本信息。如果发现该销方处于一个“多户企业同法人且同手机号”的异常关联网络中，系统应识别其具有团伙虚开的高危特征，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_056",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统必须提取每张发票的销方信息，并调用外部风控数据接口获取外部风控数据。如果检测到销方存在此类风险数据，且发票的开具日期处于该风险记录生成前的3个月内，系统应识别其存在未申报纳税的风险，阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_060",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统从行政系统获取该员工是否购买保险的结果，或者该员工入职已满3年，且填写了费用类型为保险费的费用明细项且金额（大于0），系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_075",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，如果发票上的“货物或应税劳务名称”、“备注”及“销方名称”包含敏感词库，包含：“旅游”、“团费”、“景点”、“门票”、“一日游”、“Travel&Tour”等，应立即阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_100",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需实时计算当前ECA报销单的“总报销金额”，并读取其关联项目的项目预算当前的“可用余额”。若总报销金额超过了项目的可用余额，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_101",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需自动检索报销黑名单的状态。若当前提单人处于生效的黑名单中，系统应阻断提交操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_103",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需遍历报销单中的费用明细项。若某明细项“填写了借款金额”并且其“备注”字段包含了敏感词库中的“奖”、“礼品”、“礼物”、“送礼”、“公关”、“津贴”、“预付卡”等信息，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_105",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，需要确认报销单内所有被识别为“增值税专用发票”的发票，如果发票上的“购买方名称”和“纳税人识别号”与本公司（或所在子公司）的标准信息不一致，或者地址、电话、开户银行、账号、货物劳务名称、金额等关键字段为空，系统应阻断提交，"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_107",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，需确认报销单内所有被识别为“增值税普通发票”（含电子普票、卷票）的发票信息。如果“购买方名称”不包含本公司（或子公司）的标准全称或者“纳税人识别号”与本公司税务登记号不一致或者“税号”、“货物劳务及服务名称”与“金额”等关键字段为空，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_109",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，若关键字段无法识别或字迹模糊，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_111",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需获取报销单头部的“受益公司”（或“承担主体/法人实体”）字段值，如果与发票“购买方名称”不一致（例如：受益公司选了“上海分公司”，但发票抬头是“北京总公司”），系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_113",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(提单人)提交ECA报销单时，系统需针对每一个费用明细项执行比对校验。若出现报销金额>发票总金额的情况，系统应阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_158",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景当员工提交ECA报销单时，长差租房触发动作提交ECA时，计算长差租房补助逻辑执行1.校验日综合限额：每日补助<=110元。执行动作若超限，提示调整或阻断。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_159",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差ECA触发动作提交租房报销时逻辑执行1.熔断上限：检查单套月租是否>4800元。执行动作若月租<=4800或月租>4800且有审批：允许提交，否则阻断提交，提示“单套月租金超过集团红线，需审批后支付”。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_160",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房中介费触发动作提交ECA报销单录入中介费时逻辑执行1.限额校验：中介费金额<=1个月房租；执行动作超限且无审批：阻断提交。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_204",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（提单人）提交BTA申请单时，若存在正在审核的包含借款金额的BTA申请单，借款金额也应纳入当前借款余额，以便提醒员工及财务人员"
+            }
+          ]
+        },
+        {
+          "order": "4",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_120",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景需要获取流程的权签信息输入定义接收参数：1.target_dept_id(部门ID)；2.process_type_code(流程代码，如'BTA','ECA')。逻辑运算1.在Object:Authority_Matrix中执行精确查找；2.匹配条件：Matrix.department==target_dept_idANDMatrix.process_type==process_type_code；3.获取结果：提取匹配行中的审批人工号，姓名，及审批节点顺序信息。输出定义返回审批人对象列表。若无匹配记录，返回NULL。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_186",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景审批流转触发动作审批ECA报销单，系统分配审批人时逻辑执行1.检查整个单据审批链路上，除提交人外，是否包含其他人员；2.检查职位是否是CEO。执行动作若审批链路上除提交人外，不包含其他人员且提交人不为CEO：阻断，提示“不能审批自己的申请单，无法提交审批”"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新ECA报销单状态为待审批"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "CREATE",
+            "details": "启动ECA审批流程"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "冻结或扣减预算额度"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_513",
+            "details": "场景：当系统保存ECA报销单时，如果费用明细中所有发票均为电子发票，系统应标记为\"纯电票\"流程。逻辑：设置electronicInvoiceFlg='0'",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_144",
+            "details": "适用场景提交ECA住宿报销触发动作金额录入时逻辑执行1.比对“实际金额”与“标准限额”；2.若超标，检查是否关联“超标特批单（一级主官批准）”。执行动作无特批且超标：系统自动计算超标部分，只报销标准内金额；有特批：报销全部金额。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_147",
+            "details": "适用场景ECA补助计算触发动作提交ECA报销单时逻辑执行1.识别差旅类型=短期；2.应用基准公式：补助=出差天数*50元。执行动作自动填充补助金额字段。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_148",
+            "details": "适用场景ECA补助计算触发动作提交ECA报销单合住补助时逻辑执行1.覆盖基准公式：当日补助=80元。执行动作自动填充补助金额字段。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_150",
+            "details": "适用场景ECA补助计算触发动作提交ECA报销单时逻辑执行1.出发日判断：若出发时间<12:00，记1天；若>=12:00，记0.5天。执行动作计算出发日补助天数。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_151",
+            "details": "适用场景ECA补助计算触发动作提交ECA报销单时逻辑执行1.结束日判断：若结束时间<12:00，记0.5天；若>=12:00，记1天。执行动作计算结束日补助天数。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_154",
+            "details": "适用场景当员工提交ECA报销单时，住宿标准计算触发动作读取员工职级与地区时逻辑执行1.匹配职级(A/B/C/D)；2.匹配地区(特定/其他)；3.确定限额：A级(900/850)，B级(700/600)，C级(550/500)，D级(480/400)。执行动作返回匹配的住宿限额。财务审批时添加超标提醒。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_188",
+            "details": "适用场景ECA提交触发动作提交ECA报销单时，费用日期跨年时逻辑执行1.检查当前日期是否晚于“财务关账日”。执行动作若晚于：允许提交，提示“跨年发票已停止报销，请联系财务”。财务部门人工审核。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_229",
+            "details": "当员工（提单人）提交ECA报销单时，费控系统自动根据BTA申请单编号查询查询机票费用和酒店费用，并与员工填写的报销费用求和，计算出总支出。",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_506",
+            "details": "场景：当员工对ECA报销单进行提交时，系统应实时计算diffBtaEca（ECA总报销额 - BTA预算总额）判断超支情况。逻辑：ECA > BTA 为超支，ECA <= BTA 为节约",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_500",
+            "details": "场景：当员工（外派人员）对ECA报销单进行新建时，如果BTA类型为涉及外派补助（isAssigning='1'），系统应隐藏补助明细表单。逻辑：隐藏补助明细表单（costItemMainForm1）",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_501",
+            "details": "场景：当员工（高管角色）对ECA报销单进行新建时，如果出差国家非\"中国\"，系统应显示补助明细表单。逻辑：显示补助明细表单（costItemMainForm1）",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_502",
+            "details": "场景：当员工对ECA报销单进行新建时，出差开始时间应自动带入BTA的出差开始时间且不可修改。逻辑：自动填充，只读，提示\"自动关联BTA出差开始时间，如果实际出差开始时间早于BTA时间则需重提BTA\"",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_503",
+            "details": "场景：当员工对ECA报销单修改出差结束时间时，如果修改后的结束时间早于开始时间，系统应重置为当前日期并报错。逻辑：重置日期，提示\"开始日期不能大于结束日期\"",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_504",
+            "details": "场景：当员工对ECA费用明细选择发票类型为\"发票遗失\"时，如果填写的报销金额超过发票金额的70%，系统应自动修正。逻辑：自动将报销金额修正为发票金额的70%，并提示\"发票遗失时，报销金额不可大于发票金额的70%！\"",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_505",
+            "details": "场景：当员工对ECA费用明细选择发票类型为\"发票遗失\"时，系统应将税率强制设为0%且不可编辑。逻辑：税率锁定为0%，setReadOnly(true)",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_507",
+            "details": "场景：当系统计算ECA费用明细税额时（国内交通类：机票/铁路/轮船/大巴+实名发票），应按倒扣税公式计算。逻辑：TaxAmount = Amount / (1 + Rate) * Rate",
+            "action": "MODIFY",
+            "object_type": "System"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_508",
+            "details": "场景：当系统计算ECA费用明细税额时（其他/外币情况），应按发票金额乘汇率公式计算。逻辑：TaxAmount = ReceiptAmount * ExchangeRate / (1 + Rate) * Rate",
+            "action": "MODIFY",
+            "object_type": "System"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_509",
+            "details": "场景：当系统计算ECA费用明细折算金额时，应按公式\"报销金额 × 汇率 - 税额\"计算。逻辑：ConvertAmount = Amount * ExchangeRate - Tax",
+            "action": "MODIFY",
+            "object_type": "System"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_510",
+            "details": "场景：当系统计算ECA补助天数时，如果开始时间与结束时间相同，应加1.5天。逻辑：subsidyDay = (EndDate - StartDate) / day - 1 + 1.5",
+            "action": "MODIFY",
+            "object_type": "System"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_511",
+            "details": "场景：当系统计算ECA补助天数时，如果开始时间为12:00，应加2天。逻辑：subsidyDay = (EndDate - StartDate) / day - 1 + 2",
+            "action": "MODIFY",
+            "object_type": "System"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_516",
+            "details": "场景：当财务专员对ECA报销单进行审批通过时，系统应调用金蝶将发票状态改为\"已报销\"。逻辑：调用金蝶接口更新发票状态",
+            "action": "MODIFY",
+            "object_type": "Expense_Claim"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_145",
+            "details": "适用场景提交ECA住宿报销（多人同住）触发动作填写短差补助金额并提交时，逻辑执行系统自动计算：1.读取同住人列表，获取最高职级标准；2.计算新标准=最高标准*1.2；3.检查票据附件是否包含所有同住人签名（人工确认）。执行动作超标判定基于新标准执行；缺少签名：人工驳回。",
+            "type": "INTEGRATION"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_203_B",
+            "details": "当员工创建ECA报销单并关联BTA时。系统自动从BTA申请单继承关键信息（项目编码、出差事由、出发地、开始日期等）。强锁定：继承的信息在前端必须设置为**“只读/锁定”**状态，禁止员工修改，确保报销口径与申请一致。例外豁免：**“结束日期”**字段允许开放编辑，以支持实际行程变更（如提前或延后返回），但需触发后续的Rule_025进行日期合理性校验。",
+            "type": "INTEGRATION"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_211",
+            "details": "当员工（提单人）提交ECA报销单后，报销单状态变更为“审批中”；",
+            "type": "INTEGRATION"
+          },
+          {
+            "rule_id": "Expense_Ontology_Rule_218",
+            "details": "若ECA报销单退回给员工（提单人）后，提单人补充附件重新提交ECA报销单，流程跳过员工（业务审批人）直接流转至员工（财务专员）进行审核。",
+            "type": "INTEGRATION"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Unlink_Invoice_From_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "在ECA报销单提交前，如果员工发现关联了错误的发票，可以执行解除关联操作。解除后，发票状态恢复为“未关联”，可以被其他报销单使用。报销单的总金额会自动扣减该发票的金额，相关费用明细也会被移除。",
+      "target_objects": [
+        "Expense_Claim",
+        "Invoice"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "UNLINK_INVOICE_FROM_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "invoice_ids",
+          "type": "String",
+          "required": true,
+          "description": "发票ID列表",
+          "source_object": "Invoice"
+        }
+      ],
+      "triggered_event": [
+        "UNLINK_INVOICE_FROM_ECA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "移除发票关联"
+          },
+          {
+            "object_type": "Invoice",
+            "action": "MODIFY",
+            "details": "更新发票状态为未关联"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "重新计算报销单总金额"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Sign_Physical_Documents",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "对于需要线下递交实体票据（如纸质发票、车票）的报销申请，财务人员在收到实物单据后，需要在系统中执行签收操作。签收操作确认了实物单据已送达财务部，系统会记录签收人、签收时间。只有签收后的单据才能进入后续的财务复核和支付环节。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SIGN_PHYSICAL_DOCUMENTS_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "SIGN_PHYSICAL_DOCUMENTS_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新单据状态为已签收"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Submit_Eca_Supplement",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "当ECA报销单被财务退回要求补充材料（如补充发票、修改备注）时，员工完成修改后执行此操作。提交补充材料后，单据状态变更为（待财务复核），通常会跳过业务审批直接流转回退回该单据的财务节点。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "SUBMIT_ECA_SUPPLEMENT_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "SUBMIT_ECA_SUPPLEMENT_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新单据状态为待财务复核"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Leader_Approve_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "业务审批人对ECA报销单进行审批。审批通过表示业务主管确认费用发生的真实性和合理性。审批后单据流转至下一节点（通常是财务审核）。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LEADER_APPROVE_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "审批意见",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "LEADER_APPROVE_ECA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新审批状态"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录审批日志"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "若后续无节点，状态变更为待财务审核"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "ECA_Rule_Notify_Next",
+            "rule_content": "通知"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Leader_Reject_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "业务审批人驳回ECA报销单。驳回后，单据状态变为（已驳回），释放（回滚）已扣减的预算，通知员工。员工需修改后重新提交或废弃单据。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "LEADER_REJECT_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "驳回原因",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "LEADER_REJECT_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_212",
+              "enforcement_level": "SHOULD",
+              "details": "当员工（业务审批人）驳回ECA报销单后，报销单状态变更为“待提交”，并流转回提单人。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新状态为已驳回"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "回滚已扣减的预算"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录驳回日志"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "ECA_Rule_Notify_Reject",
+            "rule_content": "通知"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Manual_Verify_Invoice",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务专员人工核验发票和单据。这是OCR自动校验后的补充步骤，重点核验票面是否有涂改、印章是否清晰、发票内容与业务实质是否一致（如餐饮发票是否附带了菜单）。核验通过后，单据进入最终审批或支付环节。",
+      "target_objects": [
+        "Invoice",
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_MANUAL_VERIFY_INVOICE_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "invoice_ids",
+          "type": "String",
+          "required": true,
+          "description": "发票ID",
+          "source_object": "Invoice"
+        },
+        {
+          "name": "verification_result",
+          "type": "String",
+          "required": true,
+          "description": "核验结果(Pass/Fail)",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_MANUAL_VERIFY_INVOICE_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Manual Verification & Invoice Audit (人工核验与发票审计)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_024",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，必须目检每一张发票的详细票面内容，判断其是否确实属于对应的ECA费用明细项所选的费用类型。如果发现票面内容与申报类型不一致，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_026",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(财务专员)对发票进行核验时，应逐一检查每张发票的“开票日期”。系统需验证该日期是否处于ECA报销单记录的“出差开始日期”与“出差结束日期”之间。如果开票日期早于出差开始时间（不含预订类票据），或晚于系统允许的报销时效，系统应该有红色预警，提示员工修改日期或者补充说明。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_028",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须检查每一张发票上“发票专用章”的完整性和清晰度。如果发现印章模糊不清、字迹无法辨认、印章重叠遮挡关键信息，或者应盖章而未盖章（且不属于免章的数电发票类型），财务人员应判定该凭证无效，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_030",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须严格比对票面上的小写金额与大写金额是否完全一致。如果发现两者金额不符（通常由开票软件错误或人为涂改造成），财务人员应判定该发票为无效凭证，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_032",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，ECA费用明细项的费用类型为“市内交通费-出租车/公交车等”或者“在途交通费-火车/轮船/大巴等”，如果关联的发票的票面没有包含日期、起止地址、发票专用章；2.针对定额发票，或者票面金额缺失或者不完整，应判定无效，财务人员应该驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_034",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对机票类的发票进行核验时，应检查ECA费用明细项中的费用类型为在途交通费-机票，如果该明细项与公司统一结算的商旅订单行程信息(航班号、日期、乘机人)重合，应驳回该ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_036",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项的费用类型为签证费，如果发票内容未明确注明“签证费”，财务人员必须查看关联的附件，核实是否上传了对应出差人员、对应国家的护照签证页照片。若无附件或附件信息与行程不符，应判定该凭证依据不足并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_038",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，需计算票面金额占核定额度的比例。如果计算结果显示该比例高于90%，应判定该发票存在虚开风险，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_040",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，应提取每张发票上的销方名称与服务名称。系统需通过外部数据接口校验销方的销售方经营范围是否覆盖了发票上的服务名称。如果系统判定发票内容明显超出销方注册的经营范围（例如餐饮公司开具了IT服务费），应判定该凭证不合规并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_042",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(财务专员)对发票进行核验时，对于卡票金额大于发票开票金额高风险阈值信息或频次大于发票开票频次高风险阈值信息，若发现开票方成立时间不足半年，应判定该凭证具有极高合规风险，要求员工（提单人）主动上传证明材料。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_044",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方地址信息。如果包含“小区”、“公寓”、“某号楼某室”等典型的住宅地址，且开票金额大于发票开票金额高风险阈值信息，应判定该凭证具有极高合规风险，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_046",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方税号或名称，并通过外部数据接口查询该企业的销售方基本信息的工商与税务状态。如果查询结果显示开票方当前处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_048",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，系统必须自动提取每张发票的“开票日期”与销方税号或名称，并调用外部数据接口查询销方当前的销售方基本信息的经营状态及状态变更日期。如果查询结果显示销方经营状态处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，且发票的开票日期晚于上述状态的变更日期，必须判定该发票无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_050",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方税号，并通过外部工商数据接口查询该企业的销售方基本信息的“实收资本”字段。若发现该企业实收资本小于1000元，但发票金额却大于发票开票金额高风险阈值信息，需要执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_053",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行人工核验时，若发现开票人、复核人、收款人为同一人，或者虽不完全相同但明显违反“制单与复核分离”的会计原则（如复核人与开票人一致），财务人员应判定该发票不合规并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_055",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票的销方信息，并调用外部接口查询销售方基本信息。如果发现该销方处于一个“多户企业同法人且同手机号”的异常关联网络中，财务人员应判定这属于团伙性质的异常开票行为，执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_057",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，如果发票金额大于发票开票金额高风险阈值信息，则调用外部风控数据接口获取外部风控数据。如果检测到销方存在此类风险数据，且发票的开具日期处于该风险记录生成前的3个月内，则执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_059",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对机票类费用进行核验时，ECA费用明细项包含费用类型为保险费，并且报销金额大于0的费用明细项，必须自动校验关联的发票（电子客票行程单或机票电子发票）。如果凭证上未识别到保险费信息，或者凭证上的保险费金额为0，应判定该笔保险费申报违规，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_061",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA费用明细项进行核验时，若确认为入职满3年的员工填写了费用类型为保险费的费用明细项，财务人员应判定为不予报销的个人消费，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_063",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项费用类型类型为“住宿费-租房”，若发现发票抬头为个人，必须打开关联的附件进行实质审核。1.核对租房合同中的租赁期、金额、房东信息是否与发票及报销申请一致。若附件缺失、审批不符或合同造假，应判定该凭证合规性不足并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_065",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项费用类型为“住宿费-租房”，且关联发票为个人抬头（非公司名称）的房租类发票时，若发现主凭证为“半张发票”（如裁剪、遮挡或标注了部分金额），必须打开附件查看是否存在完整的原发票图像。若附件中缺失完整发票，或完整发票已被核销（即重复使用），或不一致的情况，应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_066",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项关联的凭证为传统纸质发票或非免章电子发票的凭证，并且发票类型为“增值税专用发票”，如果“发票联”和“抵扣联”两联不齐全或者两联发票号码不一致或者抵扣联不清晰完整（有折痕、污损可能导致认证失败），财务人员应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_068_A",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)核验“市内交通费”时，需打开行程单附件进行比对。若行程单显示的**“上车/下车时间”不在出差起止日期范围内**，或**“起止地点”明显超出本次出差城市的业务活动范围**（如跨城、旅游景点等），应判定为非公行程并驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_068_B",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)核验“市内交通费”时，需比对发票金额与行程单附件的汇总金额。若发票金额与行程单实际支付金额不一致（通常发票金额>行程单金额），或行程单存在涂改痕迹，应判定凭证不实并驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_070",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，需确认凭证是否符合合规清单要求，如果违反了以下原则：\n1.机票：必须是行程单或税务发票，普通的“登机牌”或第三方平台的“订单截图”无效；\n2.退改签：需确认是平台（如携程）正式开具的“服务费”或“退票费”发票，而非付款记录截屏；\n3.网约车：必须是正式电子发票，而非行程单截图；\n4.通用性：拒收手写收据或无财政/税务监制章的白条。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_072",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，对于费用类型为住宿费-宾馆或者住宿费-租房的费用明细项，住宿及租房费用进行人工核验时，如果不满足以下规则：\n1.酒店发票：确认是正式的增值税发票，而非“结账单”或“预授权小票”；\n2.出租人自开发票：确认销方即为合同约定的出租方公司；\n3.税务代开发票：重点检查备注栏。此类发票销方通常显示为税务局，但备注栏必须注明实际出租人（房东）姓名及租赁地址，且需与租房合同一致。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_074",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项的费用类型为中介费、保险费、快递费、签证费，如果该费用明细项违反以下原则：\n1.中介费：严格核实发票备注，确认仅包含“中介佣金”或“代理费”，若混入了租金或其他杂费，需退回重开或拆分；\n2.保险费：确认是公司允许报销的险种（如货物运输险、差旅意外险），而非员工个人理财保险；\n3.快递费：检查寄件人/收件人及物品名称，确认是否为公事寄送；\n4.签证费：若发票内容笼统，需结合护照签证页复核。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_076",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，如果发票上的“货物或应税劳务名称”、“备注”及“销方名称”包含敏感词库，包含：“旅游”、“团费”、“景点”、“门票”、“一日游”、“Travel&Tour”等，则执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_146",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA住宿报销（多人同住）触发动作人工审核凭证时逻辑执行1.检查发票/收据原件是否有所有同住人员的签名。执行动作若缺失签名：驳回补全。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新单据状态为已核验"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录人工核验日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Approve_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务审批人（如财务经理）最终批准ECA报销单。审批通过后，单据状态变更为（待支付），系统生成支付指令推送给财务系统。此时，相关费用正式确认为公司成本，预算扣减生效。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_APPROVE_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "审批意见",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_APPROVE_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Manual Verification & Invoice Audit (人工核验与发票审计)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_024",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，必须目检每一张发票的详细票面内容，判断其是否确实属于对应的ECA费用明细项所选的费用类型。如果发现票面内容与申报类型不一致，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_026",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(财务专员)对发票进行核验时，应逐一检查每张发票的“开票日期”。系统需验证该日期是否处于ECA报销单记录的“出差开始日期”与“出差结束日期”之间。如果开票日期早于出差开始时间（不含预订类票据），或晚于系统允许的报销时效，系统应该有红色预警，提示员工修改日期或者补充说明。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_028",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须检查每一张发票上“发票专用章”的完整性和清晰度。如果发现印章模糊不清、字迹无法辨认、印章重叠遮挡关键信息，或者应盖章而未盖章（且不属于免章的数电发票类型），财务人员应判定该凭证无效，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_030",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须严格比对票面上的小写金额与大写金额是否完全一致。如果发现两者金额不符（通常由开票软件错误或人为涂改造成），财务人员应判定该发票为无效凭证，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_032",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，ECA费用明细项的费用类型为“市内交通费-出租车/公交车等”或者“在途交通费-火车/轮船/大巴等”，如果关联的发票的票面没有包含日期、起止地址、发票专用章；2.针对定额发票，或者票面金额缺失或者不完整，应判定无效，财务人员应该驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_034",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对机票类的发票进行核验时，应检查ECA费用明细项中的费用类型为在途交通费-机票，如果该明细项与公司统一结算的商旅订单行程信息(航班号、日期、乘机人)重合，应驳回该ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_036",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项的费用类型为签证费，如果发票内容未明确注明“签证费”，财务人员必须查看关联的附件，核实是否上传了对应出差人员、对应国家的护照签证页照片。若无附件或附件信息与行程不符，应判定该凭证依据不足并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_038",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，需计算票面金额占核定额度的比例。如果计算结果显示该比例高于90%，应判定该发票存在虚开风险，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_040",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，应提取每张发票上的销方名称与服务名称。系统需通过外部数据接口校验销方的销售方经营范围是否覆盖了发票上的服务名称。如果系统判定发票内容明显超出销方注册的经营范围（例如餐饮公司开具了IT服务费），应判定该凭证不合规并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_042",
+              "enforcement_level": "SHOULD",
+              "rule_content": "当员工(财务专员)对发票进行核验时，对于卡票金额大于发票开票金额高风险阈值信息或频次大于发票开票频次高风险阈值信息，若发现开票方成立时间不足半年，应判定该凭证具有极高合规风险，要求员工（提单人）主动上传证明材料。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_044",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方地址信息。如果包含“小区”、“公寓”、“某号楼某室”等典型的住宅地址，且开票金额大于发票开票金额高风险阈值信息，应判定该凭证具有极高合规风险，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_046",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方税号或名称，并通过外部数据接口查询该企业的销售方基本信息的工商与税务状态。如果查询结果显示开票方当前处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_048",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，系统必须自动提取每张发票的“开票日期”与销方税号或名称，并调用外部数据接口查询销方当前的销售方基本信息的经营状态及状态变更日期。如果查询结果显示销方经营状态处于“注销”、“撤销”、“吊销”或“经营异常（失联）”状态，且发票的开票日期晚于上述状态的变更日期，必须判定该发票无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_050",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票上的销方税号，并通过外部工商数据接口查询该企业的销售方基本信息的“实收资本”字段。若发现该企业实收资本小于1000元，但发票金额却大于发票开票金额高风险阈值信息，需要执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_053",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行人工核验时，若发现开票人、复核人、收款人为同一人，或者虽不完全相同但明显违反“制单与复核分离”的会计原则（如复核人与开票人一致），财务人员应判定该发票不合规并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_055",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，必须提取每张发票的销方信息，并调用外部接口查询销售方基本信息。如果发现该销方处于一个“多户企业同法人且同手机号”的异常关联网络中，财务人员应判定这属于团伙性质的异常开票行为，执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_057",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，如果发票金额大于发票开票金额高风险阈值信息，则调用外部风控数据接口获取外部风控数据。如果检测到销方存在此类风险数据，且发票的开具日期处于该风险记录生成前的3个月内，则执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_059",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对机票类费用进行核验时，ECA费用明细项包含费用类型为保险费，并且报销金额大于0的费用明细项，必须自动校验关联的发票（电子客票行程单或机票电子发票）。如果凭证上未识别到保险费信息，或者凭证上的保险费金额为0，应判定该笔保险费申报违规，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_061",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA费用明细项进行核验时，若确认为入职满3年的员工填写了费用类型为保险费的费用明细项，财务人员应判定为不予报销的个人消费，并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_063",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项费用类型类型为“住宿费-租房”，若发现发票抬头为个人，必须打开关联的附件进行实质审核。1.核对租房合同中的租赁期、金额、房东信息是否与发票及报销申请一致。若附件缺失、审批不符或合同造假，应判定该凭证合规性不足并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_065",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项费用类型为“住宿费-租房”，且关联发票为个人抬头（非公司名称）的房租类发票时，若发现主凭证为“半张发票”（如裁剪、遮挡或标注了部分金额），必须打开附件查看是否存在完整的原发票图像。若附件中缺失完整发票，或完整发票已被核销（即重复使用），或不一致的情况，应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_066",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项关联的凭证为传统纸质发票或非免章电子发票的凭证，并且发票类型为“增值税专用发票”，如果“发票联”和“抵扣联”两联不齐全或者两联发票号码不一致或者抵扣联不清晰完整（有折痕、污损可能导致认证失败），财务人员应判定该凭证无效并执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_068_A",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)核验“市内交通费”时，需打开行程单附件进行比对。若行程单显示的**“上车/下车时间”不在出差起止日期范围内**，或**“起止地点”明显超出本次出差城市的业务活动范围**（如跨城、旅游景点等），应判定为非公行程并驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_068_B",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)核验“市内交通费”时，需比对发票金额与行程单附件的汇总金额。若发票金额与行程单实际支付金额不一致（通常发票金额>行程单金额），或行程单存在涂改痕迹，应判定凭证不实并驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_070",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，需确认凭证是否符合合规清单要求，如果违反了以下原则：\n1.机票：必须是行程单或税务发票，普通的“登机牌”或第三方平台的“订单截图”无效；\n2.退改签：需确认是平台（如携程）正式开具的“服务费”或“退票费”发票，而非付款记录截屏；\n3.网约车：必须是正式电子发票，而非行程单截图；\n4.通用性：拒收手写收据或无财政/税务监制章的白条。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_072",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，对于费用类型为住宿费-宾馆或者住宿费-租房的费用明细项，住宿及租房费用进行人工核验时，如果不满足以下规则：\n1.酒店发票：确认是正式的增值税发票，而非“结账单”或“预授权小票”；\n2.出租人自开发票：确认销方即为合同约定的出租方公司；\n3.税务代开发票：重点检查备注栏。此类发票销方通常显示为税务局，但备注栏必须注明实际出租人（房东）姓名及租赁地址，且需与租房合同一致。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_074",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，费用明细项的费用类型为中介费、保险费、快递费、签证费，如果该费用明细项违反以下原则：\n1.中介费：严格核实发票备注，确认仅包含“中介佣金”或“代理费”，若混入了租金或其他杂费，需退回重开或拆分；\n2.保险费：确认是公司允许报销的险种（如货物运输险、差旅意外险），而非员工个人理财保险；\n3.快递费：检查寄件人/收件人及物品名称，确认是否为公事寄送；\n4.签证费：若发票内容笼统，需结合护照签证页复核。\n财务人员应执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_076",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对发票进行核验时，如果发票上的“货物或应税劳务名称”、“备注”及“销方名称”包含敏感词库，包含：“旅游”、“团费”、“景点”、“门票”、“一日游”、“Travel&Tour”等，则执行驳回操作。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_104",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，若涉借款金额大于0的费用明细项的备注包含了“办公维护”、“业务拓展”等模糊词汇，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_106",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项的费用类型与发票的“货物劳务名称”不符，财务人员不得执行同意操作，应执行驳回ECA报销单或退回ECA报销单要求重开。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_108",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果“购买方名称”是简写不是全称或者“货物劳务名称”不清洗具体，或者与报销的费用明细类型匹不配（如住宿费明细不能对应“餐饮”发票），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_110",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果发票票面存在“涂改”、“挖补”痕迹，或者金额、内容栏有手工修改的笔迹，财务人员不得执行同意操作，必须严格执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_112",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，需获取报销单头部的“受益公司”（或“承担主体/法人实体”）字段值，如果与发票“购买方名称”不一致（例如：受益公司选了“上海分公司”，但发票抬头是“北京总公司”），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_114",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果发票全额申报了包含个人消费的费用，导致实际合规凭证不足以支撑报销额，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_115",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)准备执行同意操作前，需将发票的销售方名称/税号与后台维护的“财务发布的发票黑名单”进行比对。若开票方存在于黑名单中，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_116",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，如果酒店预订（公司结算）选择的否。若已存在附件，但附件未包含银行水单或付款截屏或者支付记录上的“交易时间”与发票上的“开票日期”不一致或者支付时间晚于发票日期，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_117",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，需计算：差异额=发票金额-支付记录金额。若差异额大于20元，财务人员应认定为不合规，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_146",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA住宿报销（多人同住）触发动作人工审核凭证时逻辑执行1.检查发票/收据原件是否有所有同住人员的签名。执行动作若缺失签名：驳回补全。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_207",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，如果报销凭证为空或者补助金额为0，驳回ECA报销单，并给出审批意见报销凭证为空或者补助金额为0"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_213",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核BTA申请单时，若BTA预算明细项的预算金额超过公司差旅标准，附件或者出差目的中必须附带领导特批标记或批示文件，否则财务予以驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_231",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审批ECA报销单时，若交通费的去程发票和回城发票的行程是不连续的，财务将驳回报销单至员工（提单人）"
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Financial Audit & Exception Handling (财务审计与异常处理)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_162",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作ECA报销单审核报销时逻辑执行1.检查是否存在审批通过的部门级别执行细则。执行动作若有，按部门细则执行（前提不高于集团标准）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_174",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA补助计算触发动作审核ECA报销单计算补助金额时逻辑执行1.扣除绕道期间（在家/探亲天数）的每日补助。执行动作重新计算总补助金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_216",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单存在严重合规问题，财务专员“打回”ECA报销单，申请单转至员工（提单人），并备注不合规原因。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_221",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单状态为挂起，财务专员可以修改（核减）报销金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_224",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若发票日期小于ECA报销单的出差开始时间或者大于出差开始时间，财务专员挂起ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_226",
+              "enforcement_level": "SHOULD",
+              "rule_content": "若员工（提单人）重新提交ECA报销单时，本次提交的报销金额与原报销金额不一致或报销凭证（发票）与原报销凭证（发票）不一致时，费控系统阻断提交，附件内容可与原附件内容不一致"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_234",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单的报销凭证包含纸质发票时，如果报销凭证状态为未交票，费控系统阻断提交，并提示“请提醒提单人先完成线下交票”。"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_210",
+              "enforcement_level": "MUST",
+              "rule_content": "当ECA报销单审批结束后，费控系统自动扣减项目预算的剩余预算金额。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新状态为待支付或已支付"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务审批日志"
+          },
+          {
+            "object_type": "Finance_System",
+            "action": "CREATE",
+            "details": "推送支付指令"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "ECA_Rule_Notify_Paid",
+            "rule_content": "通知"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Finance_Reject_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务审批人驳回ECA报销单。通常用于发现严重财务违规（如虚假报销）。驳回后，流程终止，预算回滚。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_REJECT_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "驳回原因",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_REJECT_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity & Invoice Compliance Check (发票与数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_174",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA补助计算触发动作审核ECA报销单计算补助金额时逻辑执行1.扣除绕道期间（在家/探亲天数）的每日补助。执行动作重新计算总补助金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_224",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若发票日期小于ECA报销单的出差开始时间或者大于出差开始时间，财务专员挂起ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_226",
+              "enforcement_level": "SHOULD",
+              "rule_content": "若员工（提单人）重新提交ECA报销单时，本次提交的报销金额与原报销金额不一致或报销凭证（发票）与原报销凭证（发票）不一致时，费控系统阻断提交，附件内容可与原附件内容不一致"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_234",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单的报销凭证包含纸质发票时，如果报销凭证状态为未交票，费控系统阻断提交，并提示“请提醒提单人先完成线下交票”。"
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Financial Audit & Exception Handling (财务审计与异常处理)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_216",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单存在严重合规问题，财务专员“打回”ECA报销单，申请单转至员工（提单人），并备注不合规原因。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_221",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单状态为挂起，财务专员可以修改（核减）报销金额。"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "Travel & Expense Policy Compliance Check (差旅与报销政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_162",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作ECA报销单审核报销时逻辑执行1.检查是否存在审批通过的部门级别执行细则。执行动作若有，按部门细则执行（前提不高于集团标准）。"
+            }
+          ]
+        },
+        {
+          "order": "4",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_210",
+              "enforcement_level": "MUST",
+              "rule_content": "当ECA报销单审批结束后，费控系统自动扣减项目预算的剩余预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_208",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若报销单中无报销凭证则按出差起止时间确定的行程开始时间和结束时间；有报销凭证则根据报销凭证对应的时间确定行程开始时间和结束时间；员工（财务专员）根据实际行程开始时间和结束时间进行核算补助金额。",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_220",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单中报销金额存在异议，财务专员挂起ECA报销单，费控系统自动通过邮件和welink消息通知员工（提单人），报销单流程无需转至提单人",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_225",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单中住宿费-宾馆超出公司差旅标准，财务专员挂起ECA报销单，费控系统自动通过邮件和welink消息通知员工（提单人），报销单流程无需转至提单人",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_232",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审批ECA报销单时，若ECA报销单没有包含去程车票和回程车票，财务专员将ECA报销单挂起，费控系统通过邮件和welink消息通知员工（提单人）。",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_104",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，若涉借款金额大于0的费用明细项的备注包含了“办公维护”、“业务拓展”等模糊词汇，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_106",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项的费用类型与发票的“货物劳务名称”不符，财务人员不得执行同意操作，应执行驳回ECA报销单或退回ECA报销单要求重开。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_108",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果“购买方名称”是简写不是全称或者“货物劳务名称”不清洗具体，或者与报销的费用明细类型匹不配（如住宿费明细不能对应“餐饮”发票），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_110",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果发票票面存在“涂改”、“挖补”痕迹，或者金额、内容栏有手工修改的笔迹，财务人员不得执行同意操作，必须严格执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_112",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，需获取报销单头部的“受益公司”（或“承担主体/法人实体”）字段值，如果与发票“购买方名称”不一致（例如：受益公司选了“上海分公司”，但发票抬头是“北京总公司”），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_114",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果发票全额申报了包含个人消费的费用，导致实际合规凭证不足以支撑报销额，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_115",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)准备执行同意操作前，需将发票的销售方名称/税号与后台维护的“财务发布的发票黑名单”进行比对。若开票方存在于黑名单中，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_116",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果酒店预订（公司结算）选择的否。若已存在附件，但附件未包含银行水单或付款截屏或者支付记录上的“交易时间”与发票上的“开票日期”不一致或者支付时间晚于发票日期，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_117",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，需计算：差异额=发票金额-支付记录金额。若差异额大于20元，财务人员应认定为不合规，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_207",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，如果报销凭证为空或者补助金额为0，驳回ECA报销单，并给出审批意见报销凭证为空或者补助金额为0"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_213",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核BTA申请单时，若BTA预算明细项的预算金额超过公司差旅标准，附件或者出差目的中必须附带领导特批标记或批示文件，否则财务予以驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_215",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，财务专员有修改（核减）借款金额的权限，无需退回ECA报销单给员工（提单人）重新填写借款金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_217",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单缺失附件，财务专员执行“退回”（回退补正）动作，申请单转至员工（提单人），并备注补充附件原因。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_227",
+              "enforcement_level": "MUST",
+              "details": "当ECA报销单被员工（业务审批人）驳回时，费控系统自动路由至报销单员工（提单人）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_228",
+              "enforcement_level": "MUST",
+              "details": "当ECA报销单被员工（财务专员）驳回时，费控系统自动路由至报销单员工（提单人）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_231",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审批ECA报销单时，若交通费的去程发票和回城发票的行程是不连续的，财务将驳回报销单至员工（提单人）"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新状态为已驳回"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "回滚已扣减的预算"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务驳回日志"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "ECA_Rule_Notify_Reject_Fin",
+            "rule_content": "通知"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Return_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务审批人退回ECA报销单。用于资料不全或轻微错误，要求员工补充修改。退回后，单据状态变为（待修改），员工修改后可再次提交。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_RETURN_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "退回意见",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_RETURN_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Data Integrity & Invoice Compliance Check (发票与数据完整性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_174",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA补助计算触发动作审核ECA报销单计算补助金额时逻辑执行1.扣除绕道期间（在家/探亲天数）的每日补助。执行动作重新计算总补助金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_224",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若发票日期小于ECA报销单的出差开始时间或者大于出差开始时间，财务专员挂起ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_226",
+              "enforcement_level": "SHOULD",
+              "rule_content": "若员工（提单人）重新提交ECA报销单时，本次提交的报销金额与原报销金额不一致或报销凭证（发票）与原报销凭证（发票）不一致时，费控系统阻断提交，附件内容可与原附件内容不一致"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_234",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单的报销凭证包含纸质发票时，如果报销凭证状态为未交票，费控系统阻断提交，并提示“请提醒提单人先完成线下交票”。"
+            }
+          ]
+        },
+        {
+          "order": "2",
+          "name": "Financial Audit & Exception Handling (财务审计与异常处理)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_216",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单存在严重合规问题，财务专员“打回”ECA报销单，申请单转至员工（提单人），并备注不合规原因。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_221",
+              "enforcement_level": "MUST",
+              "rule_content": "当员工（财务专员）审核ECA报销单时，若ECA报销单状态为挂起，财务专员可以修改（核减）报销金额。"
+            }
+          ]
+        },
+        {
+          "order": "3",
+          "name": "Travel & Expense Policy Compliance Check (差旅与报销政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_162",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景长期出差租房触发动作ECA报销单审核报销时逻辑执行1.检查是否存在审批通过的部门级别执行细则。执行动作若有，按部门细则执行（前提不高于集团标准）。"
+            }
+          ]
+        },
+        {
+          "order": "4",
+          "name": "General Business Rules (通用业务规则)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_210",
+              "enforcement_level": "MUST",
+              "rule_content": "当ECA报销单审批结束后，费控系统自动扣减项目预算的剩余预算金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_208",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若报销单中无报销凭证则按出差起止时间确定的行程开始时间和结束时间；有报销凭证则根据报销凭证对应的时间确定行程开始时间和结束时间；员工（财务专员）根据实际行程开始时间和结束时间进行核算补助金额。",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_220",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单中报销金额存在异议，财务专员挂起ECA报销单，费控系统自动通过邮件和welink消息通知员工（提单人），报销单流程无需转至提单人",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_225",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单中住宿费-宾馆超出公司差旅标准，财务专员挂起ECA报销单，费控系统自动通过邮件和welink消息通知员工（提单人），报销单流程无需转至提单人",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_232",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审批ECA报销单时，若ECA报销单没有包含去程车票和回程车票，财务专员将ECA报销单挂起，费控系统通过邮件和welink消息通知员工（提单人）。",
+              "action": "MODIFY",
+              "object_type": "Expense_Claim"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_104",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，若涉借款金额大于0的费用明细项的备注包含了“办公维护”、“业务拓展”等模糊词汇，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_106",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果费用明细项的费用类型与发票的“货物劳务名称”不符，财务人员不得执行同意操作，应执行驳回ECA报销单或退回ECA报销单要求重开。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_108",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果“购买方名称”是简写不是全称或者“货物劳务名称”不清洗具体，或者与报销的费用明细类型匹不配（如住宿费明细不能对应“餐饮”发票），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_110",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果发票票面存在“涂改”、“挖补”痕迹，或者金额、内容栏有手工修改的笔迹，财务人员不得执行同意操作，必须严格执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_112",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，需获取报销单头部的“受益公司”（或“承担主体/法人实体”）字段值，如果与发票“购买方名称”不一致（例如：受益公司选了“上海分公司”，但发票抬头是“北京总公司”），财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_114",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果发票全额申报了包含个人消费的费用，导致实际合规凭证不足以支撑报销额，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_115",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)准备执行同意操作前，需将发票的销售方名称/税号与后台维护的“财务发布的发票黑名单”进行比对。若开票方存在于黑名单中，财务人员不得执行同意操作，应执行驳回ECA报销单"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_116",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，如果酒店预订（公司结算）选择的否。若已存在附件，但附件未包含银行水单或付款截屏或者支付记录上的“交易时间”与发票上的“开票日期”不一致或者支付时间晚于发票日期，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_117",
+              "enforcement_level": "MUST",
+              "details": "当员工(财务专员)对ECA报销单进行核验时，需计算：差异额=发票金额-支付记录金额。若差异额大于20元，财务人员应认定为不合规，财务人员不得执行同意操作，应执行驳回ECA报销单。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_207",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，如果报销凭证为空或者补助金额为0，驳回ECA报销单，并给出审批意见报销凭证为空或者补助金额为0"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_213",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核BTA申请单时，若BTA预算明细项的预算金额超过公司差旅标准，附件或者出差目的中必须附带领导特批标记或批示文件，否则财务予以驳回。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_215",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，财务专员有修改（核减）借款金额的权限，无需退回ECA报销单给员工（提单人）重新填写借款金额。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_217",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审核ECA报销单时，若ECA报销单缺失附件，财务专员执行“退回”（回退补正）动作，申请单转至员工（提单人），并备注补充附件原因。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_227",
+              "enforcement_level": "MUST",
+              "details": "当ECA报销单被员工（业务审批人）驳回时，费控系统自动路由至报销单员工（提单人）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_228",
+              "enforcement_level": "MUST",
+              "details": "当ECA报销单被员工（财务专员）驳回时，费控系统自动路由至报销单员工（提单人）。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_231",
+              "enforcement_level": "MUST",
+              "details": "当员工（财务专员）审批ECA报销单时，若交通费的去程发票和回城发票的行程是不连续的，财务将驳回报销单至员工（提单人）"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新状态为已驳回"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "回滚已扣减的预算"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务驳回日志"
+          }
+        ],
+        "notifications": [
+          {
+            "rule_id": "ECA_Rule_Notify_Reject_Fin",
+            "rule_content": "通知"
+          }
+        ],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Suspend_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务审批人挂起ECA报销单。用于需要长时间调查或等待线下单据的情况。挂起后，流程暂停。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_SUSPEND_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "approval_comments",
+          "type": "String",
+          "required": true,
+          "description": "挂起原因",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_SUSPEND_ECA_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新状态为已挂起"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务挂起日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Deduct_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "财务人员核定扣减金额。当报销单中包含部分违规或不可报销的费用时，财务可以直接扣减这部分金额，只批准剩余合规金额，而不需要完全驳回单据。系统会记录扣减原因和扣减后的实付金额。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_DEDUCT_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "Expense_Claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "deduction_amount",
+          "type": "String",
+          "required": true,
+          "description": "扣减金额",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "deduction_reason",
+          "type": "String",
+          "required": true,
+          "description": "扣减原因",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_DEDUCT_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Business Logic Validation",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_173",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA绕道报销触发动作审核ECA报销单计算报销额时逻辑执行1.对比：实际发生运费vs直线单程运费（基准）。执行动作取两者较小值作为可报销金额，超额基准部分个人承担。"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_174",
+              "enforcement_level": "MUST",
+              "rule_content": "适用场景ECA补助计算触发动作审核ECA报销单计算补助金额时逻辑执行1.扣除绕道期间（在家/探亲天数）的每日补助。执行动作重新计算总补助金额。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "更新报销单核定金额（实付金额）"
+          },
+          {
+            "object_type": "Approval_Log",
+            "action": "CREATE",
+            "details": "记录财务核减日志"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Write_Off_Loan",
+      "category": "Loan_Management",
+      "auto_or_manual": "manual",
+      "description": "当财务专员同意ECA报销单，且该员工存在未核销的借款时，财务专员会优先使用报销款来冲销借款。系统会自动计算冲销金额，更新借款记录的余额状态。如果报销金额大于借款余额，差额部分会支付给员工；如果报销金额小于借款余额，借款记录会相应减少但不会完全清零。这个机制确保了借款的及时回收和资金的合规管理。",
+      "target_objects": [
+        "Travel_Loan",
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_WRITE_OFF_LOAN_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "expense_claim",
+          "type": "Object",
+          "required": true,
+          "description": "已完成业务领导批准的ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "deduction_amount",
+          "type": "String",
+          "required": true,
+          "description": "核销金额",
+          "source_object": "Expense_Claim.deduction_amount"
+        },
+        {
+          "name": "deduction_reason",
+          "type": "String",
+          "required": true,
+          "description": "核销原因",
+          "source_object": "Travel_Loan"
+        },
+        {
+          "name": "approval_opinion",
+          "type": "String",
+          "required": true,
+          "description": "审批意见",
+          "source_object": "Travel_Loan"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_WRITE_OFF_LOAN_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Travel_Loan",
+            "action": "MODIFY",
+            "details": "更新借款记录"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "ECA报销单变为待出纳审核状态"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Cashier_Pay_Eca",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "出纳人员接收到财务审核通过的ECA报销单后，进行最终的支付操作。核对报销金额、确认收款账户信息、验证支付授权的完整性。如果员工有未清借款，会优先用报销款冲销借款，剩余部分支付给员工。支付完成后，报销单状态变更为（已支付），整个报销流程结束。出纳会生成支付凭证作为财务记录。",
+      "target_objects": [
+        "Expense_Claim"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "CASHIER_PAY_ECA_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "expense_claim",
+          "type": "Object",
+          "required": true,
+          "description": "ECA报销单",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "expense_claim",
+          "type": "String",
+          "required": true,
+          "description": "ECA报销单状态为待审批",
+          "source_object": "Expense_Claim"
+        },
+        {
+          "name": "财务同意ECA报销单",
+          "type": "String",
+          "required": true,
+          "description": "财务同意ECA报销单",
+          "source_object": "Expense_Claim"
+        }
+      ],
+      "triggered_event": [
+        "CASHIER_PAY_ECA_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Financial Compliance Check (财务合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_210",
+              "rule_content": "当ECA报销单审批结束后，费控系统自动扣减项目预算的剩余预算金额。",
+              "enforcement_level": "MUST"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "ECA报销单变为已支付状态，流程结束"
+          },
+          {
+            "object_type": "Employee",
+            "action": "MODIFY",
+            "details": "完成报销款支付给员工"
+          },
+          {
+            "object_type": "Expense_Claim",
+            "action": "MODIFY",
+            "details": "支付凭证"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Employee_Add_To_Blacklist",
+      "category": "Risk_Management",
+      "auto_or_manual": "manual",
+      "description": "财务专员发现员工存在未按时归还借款、提供虚假发票、或其他违规行为时，会将该员工加入报销黑名单。加入报销黑名单需要明确记录违规原因和生效日期。黑名单员工的报销权限会被限制，提交新的报销申请在财务审核节点会被挂起，直到黑名单移除。",
+      "target_objects": [
+        "Reimbursement_Blacklist"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "EMPLOYEE_ADD_TO_BLACKLIST_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "员工工号",
+          "type": "String",
+          "required": true,
+          "description": "员工工号",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "黑名单原因",
+          "type": "String",
+          "required": true,
+          "description": "黑名单原因",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "生效日期",
+          "type": "String",
+          "required": true,
+          "description": "生效日期",
+          "source_object": "Reimbursement_Blacklist"
+        }
+      ],
+      "triggered_event": [
+        "EMPLOYEE_ADD_TO_BLACKLIST_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Policy Compliance Check (政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_187",
+              "rule_content": "适用场景合规稽核触发动作人工标记“虚假票据”时逻辑执行1.冻结该员工报销权限；2.生成违规报告发送LOB/LOF负责人。执行动作阻断当前及后续报销，标记违规。",
+              "enforcement_level": "MUST"
+            },
+            {
+              "rule_id": "Expense_Ontology_Rule_230",
+              "enforcement_level": "MUST",
+              "rule_content": "若保证金逾期、BTA申请单借款逾期、长账龄应收未收回或预付发票逾期未回，员工（财务专员）自动员工（提单人）将被录入报销黑名单。"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "MODIFY",
+            "details": "阻断目标员工的单据提交权限"
+          },
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "MODIFY",
+            "details": "发送黑名单通知给目标员工"
+          }
+        ],
+        "notifications": []
+      }
+    },
+    {
+      "name": "Finance_Check_Offline_Tables",
+      "category": "Risk_Management",
+      "auto_or_manual": "manual",
+      "description": "财务专员在审核ECA报销单前，需要人工核对多张线下维护的表格，包括报销黑名单、客户资料表、特殊授权表等，确认申请员工是否具备报销资格。这个核查过程是财务风控的重要环节，能够识别高风险员工和异常情况。核查结果会影响后续的审批决策，核查失败的申请会被挂起或驳回。",
+      "target_objects": [
+        "Reimbursement_Blacklist"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_CHECK_OFFLINE_TABLES_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "员工工号",
+          "type": "String",
+          "required": true,
+          "description": "员工工号",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "线下表格核查结果 (Pass/Fail)",
+          "type": "String",
+          "required": true,
+          "description": "线下表格核查结果 (Pass/Fail)",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "备注",
+          "type": "String",
+          "required": true,
+          "description": "备注",
+          "source_object": "Reimbursement_Blacklist"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_CHECK_OFFLINE_TABLES_EVENT"
+      ],
+      "action_steps": [
+        {
+          "order": "1",
+          "name": "Policy Compliance Check (政策合规性校验)",
+          "rules": [
+            {
+              "rule_id": "Expense_Ontology_Rule_102",
+              "rule_content": "当员工(财务专员)对ECA报销单进行核验时，检索如果当前报销单申请人存在于报销黑名单表中，财务人员需核销借款记录。",
+              "enforcement_level": "MUST"
+            }
+          ]
+        }
+      ],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "MODIFY",
+            "details": "若核查失败，流程挂起或驳回"
+          }
+        ],
+        "notifications": []
+      }
+    },
+    {
+      "name": "Employee_Remove_From_Blacklist",
+      "category": "Risk_Management",
+      "auto_or_manual": "manual",
+      "description": "当报销黑名单中的员工已经解决了相关问题（如归还欠款、补交发票等）时，财务专员可以将其从黑名单中移除。移除操作需要记录具体的解除原因和日期，确保有据可查。移除后，员工的报销权限立即恢复，可以正常继续完成报销申请。",
+      "target_objects": [
+        "Reimbursement_Blacklist"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "EMPLOYEE_REMOVE_FROM_BLACKLIST_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "员工工号",
+          "type": "String",
+          "required": true,
+          "description": "员工工号",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "移除原因",
+          "type": "String",
+          "required": true,
+          "description": "移除原因",
+          "source_object": "Reimbursement_Blacklist"
+        },
+        {
+          "name": "移除日期",
+          "type": "String",
+          "required": true,
+          "description": "移除日期",
+          "source_object": "Reimbursement_Blacklist"
+        }
+      ],
+      "triggered_event": [
+        "EMPLOYEE_REMOVE_FROM_BLACKLIST_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "DELETE",
+            "details": "删除黑名单记录"
+          },
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "MODIFY",
+            "details": "恢复目标员工的提交权限"
+          },
+          {
+            "object_type": "Reimbursement_Blacklist",
+            "action": "MODIFY",
+            "details": "发送恢复通知给目标员工"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Employee_Repay_Loan",
+      "category": "Loan_Management",
+      "auto_or_manual": "manual",
+      "description": "当员工的报销金额小于借款金额，或者借款资金有剩余未使用时，员工需要主动归还多余的借款。归还时需要提供还款凭证（如银行转账记录），并说明还款原因。系统会更新借款记录的状态，将其标记为已结清。及时归还剩余借款有助于维护员工的信用记录，避免影响后续的借款申请。",
+      "target_objects": [
+        "Travel_Loan"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "EMPLOYEE_REPAY_LOAN_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "借款单ID",
+          "type": "String",
+          "required": true,
+          "description": "借款单ID",
+          "source_object": "Travel_Loan"
+        },
+        {
+          "name": "还款金额",
+          "type": "String",
+          "required": true,
+          "description": "还款金额",
+          "source_object": "Travel_Loan"
+        },
+        {
+          "name": "还款凭证",
+          "type": "String",
+          "required": true,
+          "description": "还款凭证",
+          "source_object": "Travel_Loan"
+        }
+      ],
+      "triggered_event": [
+        "EMPLOYEE_REPAY_LOAN_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Travel_Loan",
+            "action": "MODIFY",
+            "details": "借款记录状态变为已结清"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "Finance_Reject_Budget_Configuration",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "当缺失必要的预算审批邮件时，运营人员会拒绝为该申请配置临时预算。拒绝后，BTA申请流程会无法发起，直到申请人提供完整的审批凭证后完成预算配置才能继续。这个控制确保了预算配置的规范性。",
+      "target_objects": [
+        "Project_Monthly_Expense_Budget"
+      ],
+      "trigger": {
+        "User": [
+          "Employee"
+        ],
+        "Event": [
+          "FINANCE_REJECT_BUDGET_CONFIGURATION_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "BTA申请单号",
+          "type": "String",
+          "required": true,
+          "description": "BTA申请单号",
+          "source_object": "Project_Monthly_Expense_Budget"
+        },
+        {
+          "name": "拒绝原因",
+          "type": "String",
+          "required": true,
+          "description": "拒绝原因",
+          "source_object": "Project_Monthly_Expense_Budget"
+        },
+        {
+          "name": "缺失附件说明",
+          "type": "String",
+          "required": true,
+          "description": "缺失附件说明",
+          "source_object": "Project_Monthly_Expense_Budget"
+        }
+      ],
+      "triggered_event": [
+        "FINANCE_REJECT_BUDGET_CONFIGURATION_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "预算配置请求被拒绝"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "BTA申请单流程暂停"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "发送通知给申请人补充附件"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    },
+    {
+      "name": "System_Trigger_Budget_Configuration_By_Email",
+      "category": "ECA_Management",
+      "auto_or_manual": "manual",
+      "description": "预算审批邮件流转至运营人员，通知相关运营人员进行项目月度费用预算的配置，配置完毕后，BTA提单人员工可以选择对应的项目编码，进行BTA申请单的提交。",
+      "target_objects": [
+        "Project_Monthly_Expense_Budget"
+      ],
+      "trigger": {
+        "User": [
+          "系统"
+        ],
+        "Event": [
+          "SYSTEM_TRIGGER_BUDGET_CONFIGURATION_BY_EMAIL_EVENT"
+        ]
+      },
+      "inputs": [
+        {
+          "name": "邮件内容",
+          "type": "String",
+          "required": true,
+          "description": "邮件内容",
+          "source_object": "Project_Monthly_Expense_Budget"
+        },
+        {
+          "name": "project_code",
+          "type": "String",
+          "required": true,
+          "description": "项目编码",
+          "source_object": "Project_Monthly_Expense_Budget.project_code"
+        },
+        {
+          "name": "预算调整需求",
+          "type": "String",
+          "required": true,
+          "description": "预算调整需求",
+          "source_object": "Project_Monthly_Expense_Budget"
+        }
+      ],
+      "triggered_event": [
+        "SYSTEM_TRIGGER_BUDGET_CONFIGURATION_BY_EMAIL_EVENT"
+      ],
+      "action_steps": [],
+      "side_effects": {
+        "data_changes": [
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "CREATE",
+            "details": "创建预算配置任务"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "通知运营人员处理"
+          },
+          {
+            "object_type": "Project_Monthly_Expense_Budget",
+            "action": "MODIFY",
+            "details": "启动预算调整流程"
+          }
+        ],
+        "notifications": [],
+        "integrations": []
+      }
+    }
+  ]
+}
