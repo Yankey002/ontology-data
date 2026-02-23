@@ -1,0 +1,15 @@
+{
+  "relations": [
+    {
+      "source_kind": "Action",
+      "path": "target_objects[*]",
+      "target_kind": "Object"
+    },
+    {
+      "source_kind": "Action",
+      "path": "inputs[*].reference_to",
+      "target_kind": "Object",
+      "strategy": "split_by_dot_first_segment"
+    }
+  ]
+}
