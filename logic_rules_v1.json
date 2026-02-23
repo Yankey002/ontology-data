@@ -1,0 +1,79 @@
+{
+    "kind": "Rule",
+    "items": [
+        {
+            "id": "RULE_BTA_EDITABLE",
+            "name": "Check_Bta_Editable_State",
+            "category": "Validation",
+            "description": "判断单据是否处于可编辑状态。仅 Draft 或 Returned 允许。",
+            "inputs": [
+                {
+                    "name": "status",
+                    "type": "String"
+                }
+            ],
+            "logic": "input.status == NULL || input.status IN ['Draft', 'Returned_For_Modification']",
+            "output": {
+                "type": "Boolean",
+                "description": "True 表示状态允许编辑（放行）；False 表示状态锁定（拦截）。"
+            },
+            "error_message": "当前单据状态锁定，禁止编辑。"
+        },
+        {
+            "id": "RULE_DATE_VALIDITY",
+            "name": "Check_Date_Range",
+            "category": "Validation",
+            "description": "结束日期必须晚于开始日期。",
+            "inputs": [
+                {
+                    "name": "start",
+                    "type": "Date"
+                },
+                {
+                    "name": "end",
+                    "type": "Date"
+                }
+            ],
+            "logic": "input.end >= input.start",
+            "output": {
+                "type": "Boolean",
+                "description": "True 表示日期逻辑合法（放行）；False 表示结束早于开始（拦截）。"
+            },
+            "error_message": "结束日期早于开始日期。"
+        },
+        {
+            "id": "RULE_ANTI_TAMPER",
+            "name": "Check_Returned_Data_Integrity",
+            "category": "Validation",
+            "description": "退回防篡改核心规则：对比本次提交值与数据库原值。",
+            "inputs": [
+                {
+                    "name": "status",
+                    "type": "String"
+                },
+                {
+                    "name": "db_cost",
+                    "type": "Double"
+                },
+                {
+                    "name": "input_cost",
+                    "type": "Double"
+                },
+                {
+                    "name": "db_project",
+                    "type": "String"
+                },
+                {
+                    "name": "input_project",
+                    "type": "String"
+                }
+            ],
+            "logic": "IF(input.status == 'Returned_For_Modification', (input.db_cost == input.input_cost && input.db_project == input.input_project), TRUE)",
+            "output": {
+                "type": "Boolean",
+                "description": "True 表示数据完整未篡改（或非退回状态）；False 表示关键字段被修改。"
+            },
+            "error_message": "退回补件状态下禁止修改金额或项目归属。"
+        }
+    ]
+}

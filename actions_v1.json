@@ -1,0 +1,211 @@
+{
+    "kind": "Action",
+    "items": [
+        {
+            "id": "1",
+            "name": "Save_Bta_Draft",
+            "category": "BTA_Lifecycle_Management",
+            "auto_or_manual": "auto_agentic",
+            "description": "由预处理智能体 (Intake 或 Report Builder Agent) 调用的状态持久化工具。紧密贴合 AI 版 BTA 本体架构，支持处理复杂多段行程与费用明细，并允许对'草稿'或'被退回待修改'的单据进行无损增量更新（Upsert）。",
+            "target_objects": [
+                "Business_Travel_Application",
+                "Travel_Itinerary_Leg",
+                "BTA_Fee_Line"
+            ],
+            "trigger": {
+                "User": [
+                    "Intake_Agent",
+                    "Report_Builder_Agent",
+                    "Employee"
+                ],
+                "Event": [
+                    "DRAFT_CREATION_OR_UPDATE_EVENT"
+                ]
+            },
+            "triggered_event": "DRAFT_CREATION_OR_UPDATE_EVENT",
+            "inputs": [
+                {
+                    "name": "application_id",
+                    "type": "String",
+                    "is_reference": true,
+                    "required": false,
+                    "description": "BTA单据唯一主键。为空则新建；有值则触发更新。",
+                    "reference_to": "Business_Travel_Application.application_id"
+                },
+                {
+                    "name": "applicant_employee_id",
+                    "type": "String",
+                    "is_reference": true,
+                    "required": true,
+                    "description": "BTA单据申请人ID。",
+                    "reference_to": "Business_Travel_Application.applicant_employee_id"
+                },
+                {
+                    "name": "cost_center_project_code",
+                    "type": "String",
+                    "is_reference": true,
+                    "required": false,
+                    "description": "BTA单据所属项目代码。",
+                    "reference_to": "Business_Travel_Application.cost_center_project_code"
+                },
+                {
+                    "name": "business_reason",
+                    "type": "String",
+                    "required": false,
+                    "description": "出差事由说明。",
+                    "reference_to": "Business_Travel_Application.business_reason"
+                },
+                {
+                    "name": "billing_type",
+                    "type": "String",
+                    "required": false,
+                    "description": "出差结算类型 [客户付费, 非客户付费]。",
+                    "reference_to": "Business_Travel_Application.billing_type"
+                },
+                {
+                    "name": "travel_scope",
+                    "type": "String",
+                    "required": false,
+                    "description": "出差范围 [国内, 国外]。",
+                    "reference_to": "Business_Travel_Application.travel_scope"
+                },
+                {
+                    "name": "start_date",
+                    "type": "Date",
+                    "is_reference": true,
+                    "required": false,
+                    "description": "BTA单据开始日期。",
+                    "reference_to": "Business_Travel_Application.start_date"
+                },
+                {
+                    "name": "end_date",
+                    "type": "Date",
+                    "is_reference": true,
+                    "required": false,
+                    "description": "BTA单据结束日期。",
+                    "reference_to": "Business_Travel_Application.end_date"
+                },
+                {
+                    "name": "estimated_total_cost",
+                    "type": "Double",
+                    "required": false,
+                    "description": "预估差旅总费用。",
+                    "reference_to": "Business_Travel_Application.estimated_total_cost"
+                },
+                {
+                    "name": "requested_loan_amount",
+                    "type": "Double",
+                    "required": false,
+                    "description": "申请借款金额。Agent如果在对话中识别到借款意图，可提前落库。",
+                    "reference_to": "Business_Travel_Application.requested_loan_amount"
+                },
+                {
+                    "name": "is_corporate_flight_booking",
+                    "type": "Boolean",
+                    "required": false,
+                    "description": "机票是否由公司统筹支付。",
+                    "reference_to": "Business_Travel_Application.is_corporate_flight_booking"
+                },
+                {
+                    "name": "is_corporate_hotel_booking",
+                    "type": "Boolean",
+                    "required": false,
+                    "description": "酒店是否由公司统筹支付。",
+                    "reference_to": "Business_Travel_Application.is_corporate_hotel_booking"
+                },
+                {
+                    "name": "has_expat_allowance",
+                    "type": "Boolean",
+                    "required": false,
+                    "description": "是否涉及外派补助。",
+                    "reference_to": "Business_Travel_Application.has_expat_allowance"
+                },
+                {
+                    "name": "itinerary_legs",
+                    "type": "List<JSON>",
+                    "required": false,
+                    "description": "差旅行程明细。",
+                    "reference_to": "Business_Travel_Application.itinerary_legs"
+                },
+                {
+                    "name": "expense_budget_lines",
+                    "type": "List<JSON>",
+                    "required": false,
+                    "description": "结构化费用预算明细。",
+                    "reference_to": "Business_Travel_Application.expense_budget_lines"
+                }
+            ],
+            "submission_criteria": [
+                {
+                    "name": "Validate_Editable_State",
+                    "description": "挂载规则：检查单据是否可编辑",
+                    "mounted_rule_id": "RULE_BTA_EDITABLE",
+                    "input_mapping": {
+                        "status": "objects.Business_Travel_Application[input.application_id].status"
+                    }
+                }
+            ],
+            "action_steps": [
+                {
+                    "order": "1",
+                    "name": "runBusinessValidations",
+                    "description": "执行日期校验与防篡改风控",
+                    "object_type": "logic_execution",
+                    "rules": [
+                        {
+                            "mounted_rule_id": "RULE_DATE_VALIDITY",
+                            "input_mapping": {
+                                "start": "input.start_date",
+                                "end": "input.end_date"
+                            }
+                        },
+                        {
+                            "mounted_rule_id": "RULE_ANTI_TAMPER",
+                            "input_mapping": {
+                                "status": "objects.Business_Travel_Application[input.application_id].status",
+                                "db_cost": "objects.Business_Travel_Application[input.application_id].estimated_total_cost",
+                                "input_cost": "input.estimated_total_cost",
+                                "db_project": "objects.Business_Travel_Application[input.application_id].cost_center_project_code",
+                                "input_project": "input.cost_center_project_code"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "order": "2",
+                    "name": "persistData",
+                    "object_type": "db_operation",
+                    "condition": "Step1.passed == true",
+                    "rules": [],
+                    "inputs": [
+                        {
+                            "name": "payload",
+                            "source_object": "MainAction.inputs"
+                        }
+                    ]
+                }
+            ],
+            "side_effects": {
+                "data_changes": [
+                    {
+                        "object_type": "Business_Travel_Application",
+                        "action": "UPSERT",
+                        "property_impacted": [
+                            "ALL_INPUTS",
+                            "status"
+                        ],
+                        "value_mapping": {
+                            "status": "RULES.CALC_NEXT_STATUS_SAVE(objects.Business_Travel_Application[input.application_id].status)",
+                            "update_time": "CURRENT_TIMESTAMP"
+                        }
+                    },
+                    {
+                        "object_type": "Travel_Itinerary_Leg",
+                        "action": "SYNC_LIST",
+                        "details": "ParentID=input.application_id"
+                    }
+                ]
+            }
+        }
+    ]
+}

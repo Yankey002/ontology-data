@@ -1,0 +1,445 @@
+{
+    "kind": "Object",
+    "items": [
+        {
+            "id": "Employee",
+            "name": "员工",
+            "type": "data",
+            "description": "企业人员核心实体。已升级以支持 AI 风控与动态审批计算。",
+            "primary_key": "employee_id",
+            "properties": [
+                {
+                    "name": "employee_id",
+                    "type": "String",
+                    "description": "员工工号 (PK)"
+                },
+                {
+                    "name": "full_name",
+                    "type": "String"
+                },
+                {
+                    "name": "personnel_number",
+                    "type": "String",
+                    "description": "E-HR编码。人事系统的ID，每个员工档案对应唯一编码。"
+                },
+                {
+                    "name": "job_title",
+                    "type": "String",
+                    "description": "员工职位，员工在人事档案中的行政官衔（比如：技术.咨询顾问.设计师，是员工在公司的岗位级别）。"
+                },
+                {
+                    "name": "travel_grade",
+                    "type": "String",
+                    "description": "差旅等级，枚举值范围: [A, B, C, D]，直接决定出差可预定机票舱位和在不同城市出差时的酒店限额"
+                },
+                {
+                    "name": "department_id",
+                    "type": "String"
+                },
+                {
+                    "name": "job_title",
+                    "type": "String",
+                    "description": "行政职位（如：高级经理）"
+                },
+                {
+                    "name": "level",
+                    "type": "Integer",
+                    "description": "职级数字（如：15）。用于逻辑规则判断审批权限（如 >18级需VP审批）。"
+                },
+                {
+                    "name": "manager_id",
+                    "type": "String",
+                    "is_foreign_key": "True",
+                    "references": "Employee",
+                    "description": "直属主管工号。审批链的第一跳。"
+                },
+                {
+                    "name": "outstanding_loan_balance",
+                    "type": "Double",
+                    "description": "个人名下未还借款总额"
+                },
+                {
+                    "name": "travel_history",
+                    "type": "List<JSON>",
+                    "description": "历史差旅行为画像。AI 模型读取此数据以评估本次申请的异常度（如：是否突然前往未曾去过的敏感地区）。"
+                },
+                {
+                    "name": "system_roles",
+                    "type": "List<String>",
+                    "description": "系统角色标签 [Finance, VP, Admin...]"
+                }
+            ]
+        },
+        {
+            "id": "Business_Travel_Application",
+            "name": "BTA申请单",
+            "type": "data",
+            "description": "AI时代的核心费控凭证。不再仅仅是静态的填表数据，而是作为跨多个智能体（Intake, Compliance, Strategy）协同计算的‘黑板（Blackboard）’与状态机。它不仅记录出差预算，更承载着AI生成的合规判决、风险分与动态路由链。",
+            "relationship_description": "【员工】发起/审批【BTA申请单】；【BTA申请单】预算来源锁定【项目月度费用预算】；【BTA申请单】拥有1对N的【Travel_Itinerary_Leg】(行程段)；【BTA申请单】关联1个【Evidence_Package】(不可篡改的AI证据包)",
+            "primary_key": "application_id",
+            "properties": [
+                {
+                    "name": "application_id",
+                    "type": "String",
+                    "description": "BTA单据唯一主键。系统与Agent交互的唯一信标。"
+                },
+                {
+                    "name": "applicant_employee_id",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Employee",
+                    "description": "申请人工号。Agent 进行‘前款不清’风控拦截的关键关联键。"
+                },
+                {
+                    "name": "cost_center_project_code",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Project",
+                    "description": "项目编码。Budget Agent 锁定预算的唯一靶向目标。"
+                },
+                {
+                    "name": "estimated_total_cost",
+                    "type": "Double",
+                    "description": "预计差旅总费用。用于并发预占额度。"
+                },
+                {
+                    "name": "requested_loan_amount",
+                    "type": "Double",
+                    "description": "申请借款金额。驱动资金流向与额外的审批风控。"
+                },
+                {
+                    "name": "start_date",
+                    "type": "Date",
+                    "description": "差旅全局开始时间（用于宏观时间校验）。"
+                },
+                {
+                    "name": "end_date",
+                    "type": "Date",
+                    "description": "差旅全局结束时间。"
+                },
+                {
+                    "name": "business_reason",
+                    "type": "String",
+                    "description": "出差事由说明"
+                },
+                {
+                    "name": "billing_type",
+                    "type": "String",
+                    "description": "出差结算类型 [客户付费, 非客户付费]"
+                },
+                {
+                    "name": "travel_scope",
+                    "type": "String",
+                    "description": "出差范围 [国内, 国外]"
+                },
+                {
+                    "name": "is_corporate_flight_booking",
+                    "type": "Boolean",
+                    "description": "机票是否由公司统筹支付"
+                },
+                {
+                    "name": "is_corporate_hotel_booking",
+                    "type": "Boolean",
+                    "description": "酒店是否由公司统筹支付"
+                },
+                {
+                    "name": "has_expat_allowance",
+                    "type": "Boolean",
+                    "description": "是否涉及外派补助"
+                },
+                {
+                    "name": "itinerary_legs",
+                    "type": "List<Travel_Itinerary_Leg>",
+                    "is_foreign_key": true,
+                    "references": "Travel_Itinerary_Leg",
+                    "description": "多段行程明细集合。统一收口所有的出发地、目的地与交通工具类型，消除原先扁平字段与子表并存的数据冗余。Agent 只需维护这一个数组即可承载任意复杂的环飞/多目的地行程。"
+                },
+                {
+                    "name": "expense_budget_lines",
+                    "type": "List<BTAFeeLine>",
+                    "is_foreign_key": true,
+                    "references": "BTA_Fee_Line",
+                    "description": "分项费用预算明细。"
+                },
+                {
+                    "name": "evidence_package_id",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Evidence_Package",
+                    "description": "【新增】全链路证据包ID。绑定 AI 推理过程的不可篡改日志（包含匹配了哪条制度、哪些是超标项），实现事后可追溯审计。"
+                },
+                {
+                    "name": "ai_compliance_summary",
+                    "type": "String",
+                    "description": "【新增】合规审计摘要。Audit Narrator Agent 生成的人类可读文本，用于在前端直接展示给审批领导，免去领导查阅原政策的繁琐。"
+                },
+                {
+                    "name": "ai_risk_score",
+                    "type": "Integer",
+                    "description": "【新增】综合风险评分 (0-100)。由 Policy Compliance Agent 评估后写入。分数决定了此单据是触发高管特批，还是走免审直通车。"
+                },
+                {
+                    "name": "status",
+                    "type": "String",
+                    "enum": [
+                        "Draft",
+                        "Returned_For_Modification",
+                        "Pending_Leader_Approval",
+                        "Completed",
+                        "Closed",
+                        "Rejected"
+                    ],
+                    "description": "单据生命周期状态。在 Save 动作中，该值由规则 CALC_NEXT_STATUS_SAVE 推导得出。"
+                },
+                {
+                    "name": "current_approver",
+                    "type": "String",
+                    "description": "【新增】当前审批人工号。这是 Action `Record_Bta_Approval` 执行 ACL（访问控制）强拦截的核心字段，防止越权和 Agent 幻觉。"
+                },
+                {
+                    "name": "create_time",
+                    "type": "Date",
+                    "description": "记录创建时间。"
+                },
+                {
+                    "name": "last_modified_by",
+                    "type": "String",
+                    "description": "最后修改者（可以是具体的员工 ID，也可以是执行修改的 Agent ID）。"
+                },
+                {
+                    "name": "update_time",
+                    "type": "Date",
+                    "description": "记录更新时间。"
+                },
+                {
+                    "name": "is_auto_approved",
+                    "type": "Boolean",
+                    "description": "【新增】免审直通车标识。若为 true，底层的 Action 引擎将在提交时直接跳过人工审批，扭转状态至'待支付'。"
+                },
+                {
+                    "name": "future_approvers",
+                    "type": "List<String>",
+                    "description": "【新增】未来审批人队列。由 Approval Strategy Agent 生成的有序数组。Action 每次被触发后，会从数组头部 POP 出下一个人填入 current_approver。"
+                },
+                {
+                    "name": "return_checkpoint_approver",
+                    "type": "String",
+                    "description": "【断点锚记】记录退回单据的审批人ID，用于后续'直通车'路由逻辑。",
+                    "references": "Employee",
+                    "is_foreign_key": true
+                }
+            ]
+        },
+        {
+            "id": "Travel_Itinerary_Leg",
+            "name": "AI版行程段明细 (Itinerary Leg)",
+            "type": "data",
+            "description": "承载多目的地、多交通方式的复杂差旅子表。由 Intake Agent 解析自然语言生成，支持 AI 置信度标记，引导用户补全缺失的行程要素。",
+            "relationship_description": "【行程段明细】属于【BTA申请单】",
+            "primary_key": "leg_id",
+            "properties": [
+                {
+                    "name": "leg_id",
+                    "type": "String",
+                    "description": "行程段唯一主键（UUID）。"
+                },
+                {
+                    "name": "application_id",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Business_Travel_Application",
+                    "description": "关联的 BTA 申请单号。Action 靠它执行 SYNC_LIST。"
+                },
+                {
+                    "name": "leg_sequence",
+                    "type": "Integer",
+                    "description": "航程序号（1, 2, 3...）。用于构建有向图（Graph），告诉 Agent 行程的先后顺序，防止出现“时空穿越”的逻辑漏洞。"
+                },
+                {
+                    "name": "origin_city",
+                    "type": "String",
+                    "description": "出发地。"
+                },
+                {
+                    "name": "destination_city",
+                    "type": "String",
+                    "description": "到达地。Policy Agent 将根据此城市的级别（如：一线/二线）提取对应的差旅补助标准。"
+                },
+                {
+                    "name": "start_date",
+                    "type": "Date",
+                    "description": "该段行程的出发时间。"
+                },
+                {
+                    "name": "end_date",
+                    "type": "Date",
+                    "description": "该段行程的结束时间。"
+                },
+                {
+                    "name": "transport_type",
+                    "type": "String",
+                    "description": "交通方式。枚举：[Flight (飞机), Train (火车), Car (自驾/打车), Ship (轮船)]。"
+                },
+                {
+                    "name": "ai_parsed_confidence",
+                    "type": "String",
+                    "description": "【新增】AI解析置信度。枚举：[High (高 - 信息完整), Low (低 - 需用户确认)]。例如用户没说怎么去，Agent 默认填了 Flight，此处标记为 Low。"
+                }
+            ]
+        },
+        {
+            "id": "BTA_Fee_Line",
+            "name": "AI版费用预算明细 (Fee Line)",
+            "type": "data",
+            "description": "BTA 费用的细粒度拆分。支持 Estimation Agent 自动估算，并引入了‘智能基准对比’能力，为后续的合规审计提供底层数据支撑。",
+            "relationship_description": "【费用明细】属于【BTA申请单】",
+            "primary_key": "fee_line_id",
+            "properties": [
+                {
+                    "name": "fee_line_id",
+                    "type": "String",
+                    "description": "费用明细唯一主键（UUID）。"
+                },
+                {
+                    "name": "application_id",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Business_Travel_Application",
+                    "description": "关联的 BTA 申请单号。"
+                },
+                {
+                    "name": "expense_type",
+                    "type": "String",
+                    "description": "费用大类。枚举：[Transportation (大交通), Accommodation (住宿), Meals (餐饮), Miscellaneous (杂项)]。"
+                },
+                {
+                    "name": "expense_sub_type",
+                    "type": "String",
+                    "description": "费用子类。例如：机票、高铁、酒店、市内交通。"
+                },
+                {
+                    "name": "estimated_amount",
+                    "type": "Double",
+                    "description": "用户或 Agent 填写的该分项预估金额。"
+                },
+                {
+                    "name": "currency",
+                    "type": "String",
+                    "description": "币种（默认 CNY）。"
+                },
+                {
+                    "name": "ai_benchmark_amount",
+                    "type": "Double",
+                    "description": "【新增】AI基准参考价。Estimation Agent 根据行程时间、城市级别、员工职级，从制度库中提取或推算出的合理价格上限。"
+                },
+                {
+                    "name": "ai_is_over_benchmark",
+                    "type": "Boolean",
+                    "description": "【新增】超标预警标识。逻辑判断：estimated_amount > ai_benchmark_amount。如果为 true，前端界面可直接高亮飘红，要求员工填写超标理由。"
+                },
+                {
+                    "name": "over_benchmark_reason",
+                    "type": "String",
+                    "description": "超标理由说明。如果 AI 判定超标，员工可在此输入自然语言解释（如：‘展会期间周边酒店全部涨价’），该理由将供后续的业务领导审批参考。"
+                }
+            ]
+        },
+        {
+            "id": "Evidence_Package",
+            "name": "AI全链路证据包 (Evidence Package)",
+            "type": "data",
+            "description": "【新增】不可篡改的审计日志。记录了每次 Agent 运行的输入（Prompt）、输出（Output）以及系统参数（Metadata），是实现‘AI 决策可追溯’的核心载体。",
+            "relationship_description": "【证据包】由【BTA申请单】引用",
+            "primary_key": "evidence_id",
+            "properties": [
+                {
+                    "name": "evidence_id",
+                    "type": "String",
+                    "description": "证据包唯一ID（UUID）。"
+                },
+                {
+                    "name": "application_id",
+                    "type": "String",
+                    "is_foreign_key": true,
+                    "references": "Business_Travel_Application",
+                    "description": "关联的 BTA 申请单号。"
+                },
+                {
+                    "name": "agent_name",
+                    "type": "String",
+                    "description": "执行本次操作的 Agent 名称（如：IntakeAgent, PolicyComplianceAgent）。"
+                },
+                {
+                    "name": "action_name",
+                    "type": "String",
+                    "description": "执行的动作名称（如：SUBMIT_BTA, VALIDATE_POLICY）。"
+                },
+                {
+                    "name": "input_prompt",
+                    "type": "String",
+                    "description": "【核心】Agent 执行时的完整 Prompt 内容。包含系统指令、用户输入及上下文。"
+                },
+                {
+                    "name": "output_result",
+                    "type": "String",
+                    "description": "【核心】Agent 返回的结构化数据或文本。"
+                },
+                {
+                    "name": "execution_timestamp",
+                    "type": "DateTime",
+                    "description": "Agent 运行时间戳。"
+                },
+                {
+                    "name": "is_compliant",
+                    "type": "Boolean",
+                    "description": "【新增】合规判定结果。Policy Agent 运行后，记录该次提交是否符合制度。"
+                },
+                {
+                    "name": "ai_narrative_summary",
+                    "type": "String",
+                    "description": "【新增】审计摘要。Audit Narrator Agent 生成的人类可读解释，说明本次操作的原因和影响。"
+                }
+            ]
+        },
+        {
+            "id": "Project",
+            "name": "项目",
+            "type": "data",
+            "description": "",
+            "relationship_description": "",
+            "primary_key": "project_id",
+            "properties": [
+                {
+                    "name": "project_id",
+                    "type": "String",
+                    "description": "项目唯一ID（UUID）。"
+                },
+                {
+                    "name": "project_name",
+                    "type": "String",
+                    "description": "项目名称。"
+                },
+                {
+                    "name": "project_description",
+                    "type": "String",
+                    "description": "项目描述。"
+                },
+                {
+                    "name": "project_status",
+                    "type": "String",
+                    "description": "项目状态。"
+                },
+                {
+                    "name": "project_create_time",
+                    "type": "Date",
+                    "description": "项目创建时间。"
+                },
+                {
+                    "name": "project_update_time",
+                    "type": "Date",
+                    "description": "项目更新时间。"
+                }
+            ]
+        }
+    ]
+}
