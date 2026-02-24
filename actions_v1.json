@@ -6,7 +6,7 @@
             "name": "Save_Bta_Draft",
             "category": "BTA_Lifecycle_Management",
             "auto_or_manual": "auto_agentic",
-            "description": "由预处理智能体 (Intake 或 Report Builder Agent) 调用的状态持久化工具。紧密贴合 AI 版 BTA 本体架构，支持处理复杂多段行程与费用明细，并允许对'草稿'或'被退回待修改'的单据进行无损增量更新（Upsert）。",
+            "description": "由预处理智能体 (Intake 或 Report Builder Agent) 调用的状态持久化工具。紧密贴合 AI 版 BTA 本体架构，支持处理复杂多段行程与费用明细，并允许对'草稿'或'被退回待修改'的单据进行无损增量更新（Upsert）。1",
             "target_objects": [
                 "Business_Travel_Application",
                 "Travel_Itinerary_Leg",
