@@ -1,15 +1,37 @@
 {
+  "entities": {
+    "Action": {
+      "displayLabel": "name",
+      "filePattern": "actions*.json",
+      "icon": "Zap",
+      "primaryKey": "id"
+    },
+    "Object": {
+      "displayLabel": "name",
+      "filePattern": "objects*.json",
+      "icon": "Box",
+      "primaryKey": "id"
+    },
+    "Rule": {
+      "displayLabel": "name",
+      "filePattern": "logic_rules*.json",
+      "icon": "BookOpen",
+      "primaryKey": "id"
+    }
+  },
+  "items_field": "items",
+  "kind_field": "kind",
   "relations": [
     {
-      "source_kind": "Action",
       "path": "target_objects[*]",
+      "source_kind": "Action",
       "target_kind": "Object"
     },
     {
-      "source_kind": "Action",
       "path": "inputs[*].reference_to",
-      "target_kind": "Object",
-      "strategy": "split_by_dot_first_segment"
+      "source_kind": "Action",
+      "strategy": "split_by_dot_first_segment",
+      "target_kind": "Object"
     }
   ]
 }
